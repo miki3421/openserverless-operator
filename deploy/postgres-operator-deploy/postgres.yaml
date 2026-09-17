@@ -23,8 +23,9 @@ metadata:
   namespace: openserverless
 spec:
    replicas: 2
-   image: pgvector/pgvector:pg16
+   image: docker.io/pgvector/pgvector:0.8.6-pg18-bookworm@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
    database:
+      volumeMount: /var/lib/postgresql
       size: 200Mi
    customConfig: openserverless-postgres-conf    
    env:

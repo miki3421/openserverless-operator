@@ -37,7 +37,7 @@ spec:
       restartPolicy: Always    
       containers:
       - name: openserverless-postgres-backup
-        image: ghcr.io/nuvolaris/pg-dumper:16.3.2405222002
+        image: miki3421/ops-advanced-pg-dumper:18.6-pgvector0.8.6-dev
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash","-c","/root/backup_start.sh"]
         env:
@@ -53,7 +53,7 @@ spec:
         - name: BACKUP_DESTINATION_FOLDER
           value: {{dir}}
         - name: BACKUP_SOURCE_DB_HOST_NAME
-          value: openserverless-postgres-replica
+          value: openserverless-postgres
         - name: BACKUP_IMPORT_DB_HOST_NAME
           value: openserverless-postgres
         - name: POSTGRES_PASSWORD

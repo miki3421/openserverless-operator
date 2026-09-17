@@ -24,7 +24,8 @@ metadata:
 data:
   backup_database.sh: |
     #!/bin/bash
-    set -e
+    set -euo pipefail
+    umask 077
 
     dt=$(date '+%d/%m/%Y %H:%M:%S');
     fileDt=$(date '+%d_%m_%Y_%H_%M_%S');
@@ -32,15 +33,14 @@ data:
     backUpFilePath="$BACKUP_DESTINATION_FOLDER/$backUpFileName"
 
     echo "$dt - Starting DB backup of Kubegres resource $KUBEGRES_RESOURCE_NAME into file: $backUpFilePath";
-    echo "$dt - Running: pg_dumpall -h $BACKUP_SOURCE_DB_HOST_NAME -U postgres -c | gzip > $backUpFilePath"
+    echo "$dt - Running: pg_dumpall -h $BACKUP_SOURCE_DB_HOST_NAME -U postgres -c --if-exists | gzip > $backUpFilePath"
 
-    pg_dumpall -h $BACKUP_SOURCE_DB_HOST_NAME -U postgres -c | gzip > $backUpFilePath
-
-    if [ $? -ne 0 ]; then
-      rm $backUpFilePath
+    if ! pg_dumpall -h "$BACKUP_SOURCE_DB_HOST_NAME" -U postgres -c --if-exists | gzip > "$backUpFilePath.partial"; then
+      rm -f "$backUpFilePath.partial"
       echo "Unable to execute a BackUp. Please check DB connection settings"
       exit 1
     fi
+    mv "$backUpFilePath.partial" "$backUpFilePath"
 
     find $BACKUP_DESTINATION_FOLDER -type f -mtime +1 -name '*.gz' -execdir rm -- '{}' \;
     echo "$dt - DB backup completed for Kubegres resource $KUBEGRES_RESOURCE_NAME into file: $backUpFilePath";
@@ -55,6 +55,7 @@ data:
       service cron start
 
       echo "$dt - Scheduling: $BACKUP_SCHEDULE /tmp/backup_database.sh"
-      (crontab -l 2>/dev/null || true; echo "$BACKUP_SCHEDULE export KUBEGRES_RESOURCE_NAME=$KUBEGRES_RESOURCE_NAME; export BACKUP_DESTINATION_FOLDER=$BACKUP_DESTINATION_FOLDER; export BACKUP_SOURCE_DB_HOST_NAME=$BACKUP_SOURCE_DB_HOST_NAME; export PGPASSWORD=$PGPASSWORD; /tmp/backup_database.sh /dev/stdout 2>&1;") | crontab -
+      umask 077
+      declare -p KUBEGRES_RESOURCE_NAME BACKUP_DESTINATION_FOLDER BACKUP_SOURCE_DB_HOST_NAME PGPASSWORD > /run/backup-env
+      echo "$BACKUP_SCHEDULE /bin/bash -c 'source /run/backup-env; exec /tmp/backup_database.sh' > /proc/1/fd/1 2> /proc/1/fd/2" | crontab -
       while true; do sleep 60; done;
-

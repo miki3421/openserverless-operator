@@ -25,6 +25,7 @@ import openserverless.openwhisk as openwhisk
 import openserverless.template as ntp
 import urllib.parse
 import openserverless.operator_util as operator_util
+import openserverless.postgres_profile as postgres_profile
 
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
@@ -33,7 +34,8 @@ def create(owner=None):
     """
     Deploys the postgres using kubegres operator and wait for the operator to be ready.
     """
-    logging.info("*** creating kubegres-operator")        
+    postgres_profile.preflight(kube.kubectl)
+    logging.info("*** creating kubegres-operator")
     pg_cm_data = util.postgres_manager_affinity_tolerations_data()
     pg_op_kust = kus.patchTemplates("postgres-operator",templates=["affinity-tolerance-dep-core-attach.yaml"], data=pg_cm_data)
     spec = kus.kustom_list("postgres-operator",pg_op_kust, templates=[], data={})
@@ -337,4 +339,4 @@ def exec_psql_command_in_db(db_name,pod_name,path_to_psql_script,path_to_pgpass)
     res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"PGPASSFILE='/tmp/.pgpass' psql --username postgres --dbname {db_name} -f {path_to_psql_script}")
     os.remove(path_to_psql_script)
     os.remove(path_to_pgpass)
-    return res                               
+    return res
