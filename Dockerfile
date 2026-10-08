@@ -24,6 +24,8 @@ RUN groupadd --gid 1001 openserverless && \
 
 USER openserverless
 WORKDIR /home/openserverless
+# Create destination parents as the runtime user before copying nested files.
+RUN mkdir -p openserverless deploy
 # install the operator
 ADD --chown=openserverless:openserverless openserverless/*.py /home/openserverless/openserverless/
 ADD --chown=openserverless:openserverless openserverless/files /home/openserverless/openserverless/files
@@ -84,7 +86,7 @@ ENV POETRY_CACHE_DIR=/opt/.cache
 ENV PATH=${POETRY_HOME}/bin:$PATH
 
 WORKDIR /home/openserverless
-COPY --chown=openserverless:openserverless pyproject.toml poetry.lock /home/openserverless/
+COPY --chown=1001:1001 pyproject.toml poetry.lock /home/openserverless/
 RUN echo "Installing poetry" && \
     # Install minimal dependencies
     echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
