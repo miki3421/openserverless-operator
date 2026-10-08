@@ -66,3 +66,7 @@ An isolated Kind v1.33.1 cluster in the retained KVM VM passed:
 - Eight unit tests; read-only rejection of the existing host PostgreSQL 16 deployment.
 
 This is not yet validation of the complete OPS application suite, FerretDB, automated major-version migration, automatic failover under node failure, performance gains, or ARM64 execution. See the root Advanced roadmap for those gates.
+
+## Integrated K3s validation (2026-10-08)
+
+A fresh full OPS Advanced installation on the retained `ops-advanced-rc7` VM runs this PostgreSQL 18.6/pgvector 0.8.6 profile with two database pods and checksums enabled. FerretDB, JavaScript/Python database actions and HTTP SSO mock tests passed. Two non-superusers wrote and queried JSONB/vector data in their own schemas; cross-database connections and an invalid password were refused. Both replicas retained the row counts and checksums across a primary-pod restart. Repeated setup preserved PVC identity, tenant data and the existing default user's credentials. See the root `ADVANCED.md` report and `advanced/lab/` scripts for evidence and limitations. This does not establish automatic failover on node loss, ARM64 compatibility or production migration safety.
