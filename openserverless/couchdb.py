@@ -22,6 +22,7 @@ import openserverless.couchdb_util as cu
 import openserverless.config as cfg
 import openserverless.couchdb_util
 import openserverless.util as util
+import openserverless.couchdb_profile as couchdb_profile
 
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
@@ -38,6 +39,9 @@ def update_templated_doc(db, database, template, data):
 def create(owner=None):
     logging.info("create couchdb")
     runtime = cfg.get('openserverless.kube')
+    if runtime == 'openshift':
+        raise RuntimeError("OPS Advanced CouchDB 3.5 requires a separately validated OpenShift image; no CouchDB resources were changed.")
+    couchdb_profile.preflight(kube.kubectl)
     u = cfg.get('couchdb.admin.user', "COUCHDB_ADMIN_USER", "whisk_admin")
     p = cfg.get('couchdb.admin.password', "COUCHDB_ADMIN_PASSWORD", "some_passw0rd")
     user = f"db_username={u}"
@@ -46,7 +50,7 @@ def create(owner=None):
     img = cfg.get('operator.image', 'OPERATOR_IMAGE', "missing-operator-image")
     tag = cfg.get('operator.tag', 'OPERATOR_TAG', "missing-operator-tag")
     image = f"{img}:{tag}"
-    container_image = runtime in ['openshift'] and "ghcr.io/nuvolaris/couchdb:2.3.1-nuvolaris.23101915" or "apache/couchdb:2.3"
+    container_image = couchdb_profile.PROFILE["image"]
 
     config = json.dumps(cfg.getall())
     data = {
@@ -68,6 +72,7 @@ def create(owner=None):
         "replicationRole":"primary",
         "appName":"openserverless-couchdb"
     }
+    data["settings_sha256"] = couchdb_profile.SETTINGS_SHA256
 
     tplp = ["set-attach.yaml"]
     util.couch_affinity_tolerations_data(data)
@@ -78,6 +83,11 @@ def create(owner=None):
     kust =  kus.secretLiteral("couchdb-auth", user, pasw)
     kust += kus.patchTemplates("couchdb",tplp,data)
     spec = kus.restricted_kustom_list("couchdb", kust, templates=["couchdb-init.yaml"],templates_filter=["couchdb-set_generated.yaml","couchdb-svc.yaml"],data=data)
+    spec['items'].append({
+        "apiVersion": "v1", "kind": "ConfigMap",
+        "metadata": {"name": "couchdb-settings", "namespace": "openserverless"},
+        "data": {"00-openserverless.ini": couchdb_profile.SETTINGS},
+    })
     
     if owner:
         kopf.append_owner_reference(spec['items'], owner)
@@ -181,7 +191,7 @@ def init():
         logging.basicConfig(level=logging.INFO)
         spec = json.loads(config)
         cfg.configure(spec)
-        for k in cfg.getall(): logging.info(f"{k} = {cfg.get(k)}")
+        logging.info("Loaded CouchDB initialization configuration")
 
     # dynamically detect couchdb pod and wait for readiness
     util.wait_for_pod_ready("{.items[?(@.metadata.labels.name == 'couchdb')].metadata.name}")
@@ -274,4 +284,3 @@ def delete_ow_user(subject):
 
     
     
-

@@ -142,21 +142,18 @@ def delete_seaweedfs_ingress(runtime, namespace, ingress_class, type, owner=None
     """    
     logging.info("*** removing ingresses for seaweedfs upload")
     
-    try:
-        res = ""
-        if(runtime=='openshift'):
-            res = kube.kubectl("delete", "route",endpoint.api_route_name(namespace,type))
-            return res
-
-        res += kube.kubectl("delete", "ingress",endpoint.api_ingress_name(namespace,type))    
-
-        if(ingress_class == 'traefik'):            
-            res = kube.kubectl("delete", util.get_traefik_middleware_resource(),endpoint.api_middleware_ingress_name(namespace,type))
-
-        return res
-    except Exception as e:
-        logging.warn(e)       
-        return None    
+    # An already-removed resource is a successful retry; other API errors must
+    # reach Kopf so it retains the finalizer and retries the cleanup.
+    if runtime == 'openshift':
+        return kube.kubectl("delete", "route", endpoint.api_route_name(namespace,type),
+                            "--ignore-not-found", namespace=namespace)
+    res = kube.kubectl("delete", "ingress", endpoint.api_ingress_name(namespace,type),
+                       "--ignore-not-found", namespace=namespace)
+    if ingress_class == 'traefik':
+        res += kube.kubectl("delete", util.get_traefik_middleware_resource(),
+                            endpoint.api_middleware_ingress_name(namespace,type),
+                            "--ignore-not-found", namespace=namespace)
+    return res
 
 def delete_seaweedfs_ingresses(data, owner=None):
     namespace = "openserverless"

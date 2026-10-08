@@ -43,6 +43,7 @@ spec:
         replicationRole: primary
       annotations:
         whisks.openserverless.org/annotate-version: "true"
+        ops.advanced/couchdb-settings-sha256: "{{settings_sha256}}"
     spec:
       restartPolicy: Always
       containers:
@@ -52,6 +53,7 @@ spec:
         args:
         - |
           ulimit -n 1048576
+          cp /var/run/ops-couchdb-config/00-openserverless.ini /opt/couchdb/etc/local.d/00-openserverless.ini || exit 1
           exec tini -- /docker-entrypoint.sh /opt/couchdb/bin/couchdb
         {% if runtime == 'openshift' %}
         securityContext:
@@ -93,3 +95,11 @@ spec:
               key: db_password
         - name: "NODENAME"
           value: "couchdb0"
+        volumeMounts:
+        - name: couchdb-settings
+          mountPath: /var/run/ops-couchdb-config
+          readOnly: true
+      volumes:
+      - name: couchdb-settings
+        configMap:
+          name: couchdb-settings

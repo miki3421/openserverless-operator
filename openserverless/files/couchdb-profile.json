@@ -1,0 +1,6 @@
+{
+  "major": 3,
+  "expected_version": "3.5.2",
+  "image": "docker.io/apache/couchdb:3.5.2@sha256:c703989c0a370a1a6b179785bcb5b2b5501347bb0219d02d597d0a9107eb8d28",
+  "volume_mount": "/opt/couchdb/data"
+}

@@ -105,7 +105,7 @@ def delete(obj, namespace="openserverless"):
     # tested with apply
     if not isinstance(obj, str):
         obj = json.dumps(obj)
-    return kubectl("delete", "-f", "-", namespace=namespace, input=obj)
+    return kubectl("delete", "--ignore-not-found", "-f", "-", namespace=namespace, input=obj)
 
 # shortcut
 def ctl(arg, jsonpath='{@}', flatten=False):

@@ -117,6 +117,9 @@ class CouchDB:
 
   def configure_single_node(self):
     url = f"{self.db_url}/_cluster_setup"
+    current = self.db_session.get(url)
+    if current.status_code == 200 and current.json().get("state") == "single_node_enabled":
+      return True
     data = {"action": "enable_single_node", "singlenode": True, "bind_address": "0.0.0.0", "port": 5984}
     r = self.db_session.post(url, json=data) 
     return r.status_code == 201
@@ -129,7 +132,7 @@ class CouchDB:
 
   def enable_db_compaction(self,db_name):    
     url = f"{self.db_url}/_node/_local/_config/compactions/{self.db_prefix}{db_name}"    
-    data = '[{db_fragmentation, \"60%\"}, {view_fragmentation, \"60%\"}]'
+    data = '[{db_fragmentation, "60%"}, {view_fragmentation, "60%"}]'
     r = self.db_session.put(url, json=data)
     return r.status_code == 200   
 
@@ -167,4 +170,4 @@ class CouchDB:
       return json.loads(r.text)
     
     logging.warn(f"query to {url} failed with {r.status_code}. Body {r.text}")
-    return None    
+    return None
