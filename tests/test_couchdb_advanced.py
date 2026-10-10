@@ -97,5 +97,16 @@ class CouchDBAdvancedTests(unittest.TestCase):
         db.db_session.post.return_value.status_code=401
         self.assertFalse(db.configure_single_node())
 
+    def test_users_metadata_restricts_reads_to_admin_api_identity(self):
+        db = Mock()
+        db.wait_db_ready.return_value = True
+        db.check_db.return_value = True
+        db.create_db.return_value = True
+        db.add_role.return_value = True
+        with patch.object(couchdb.cfg, "get", return_value="whisk_admin"):
+            self.assertTrue(couchdb.init_users_metadata(db))
+        db.add_role.assert_called_once_with("users_metadata", ["whisk_admin"])
+        db.create_db.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
