@@ -17,12 +17,45 @@
 
 import json
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from openserverless import seaweedfs_deploy
 
 
 class AnonymousS3AccessTest(unittest.TestCase):
+    @patch.object(seaweedfs_deploy, "SeaweedfsClient")
+    def test_failed_revoke_preserves_web_bucket_and_identity_until_retry(self, factory):
+        config = Mock()
+        config.get.side_effect = {
+            "namespace": "alpha",
+            "object-storage.data.enabled": False,
+            "object-storage.route.enabled": True,
+            "object-storage.route.bucket": "alpha-web",
+        }.get
+        client = factory.return_value
+        for failure in (False, RuntimeError("S3 unavailable")):
+            with self.subTest(failure=failure):
+                client.reset_mock()
+                client.remove_anonymous_access.side_effect = None
+                client.remove_anonymous_access.return_value = False
+                if isinstance(failure, Exception):
+                    client.remove_anonymous_access.side_effect = failure
+                with self.assertRaises(RuntimeError):
+                    seaweedfs_deploy.delete_ow_storage(config)
+                client.force_bucket_remove.assert_not_called()
+                client.delete_user.assert_not_called()
+
+        client.reset_mock()
+        client.remove_anonymous_access.side_effect = None
+        client.remove_anonymous_access.return_value = True
+        client.delete_user.return_value = True
+        self.assertTrue(seaweedfs_deploy.delete_ow_storage(config))
+        self.assertEqual(client.mock_calls, [
+            call.remove_anonymous_access("alpha-web"),
+            call.force_bucket_remove("alpha-web"),
+            call.delete_user("alpha"),
+        ])
+
     @patch.object(seaweedfs_deploy.kube, "kubectl")
     def test_reconcile_legacy_grant_preserves_only_public_buckets(self, kubectl):
         kubectl.return_value = json.dumps({"items": [

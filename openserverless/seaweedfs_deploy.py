@@ -251,7 +251,8 @@ def delete_ow_storage(ucfg):
     if(ucfg.get('object-storage.route.enabled')):
         bucket_name = ucfg.get("object-storage.route.bucket")
         logging.info(f"*** removing public bucket {bucket_name} for {namespace}")
-        seaweedfsClient.remove_anonymous_access(bucket_name)
+        if not seaweedfsClient.remove_anonymous_access(bucket_name):
+            raise RuntimeError(f"Could not revoke anonymous S3 access to bucket {bucket_name}; deletion stopped")
         seaweedfsClient.force_bucket_remove(bucket_name)
 
     return seaweedfsClient.delete_user(namespace)
