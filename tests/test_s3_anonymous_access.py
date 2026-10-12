@@ -56,6 +56,51 @@ class AnonymousS3AccessTest(unittest.TestCase):
             call.delete_user("alpha"),
         ])
 
+    @patch.object(seaweedfs_deploy, "SeaweedfsClient")
+    def test_revoke_precedes_data_deletion_and_shared_bucket_is_deleted_once(self, factory):
+        config = Mock()
+        values = {
+            "namespace": "legacy",
+            "object-storage.data.enabled": True,
+            "object-storage.data.bucket": "shared",
+            "object-storage.route.enabled": True,
+            "object-storage.route.bucket": "shared",
+        }
+        config.get.side_effect = values.get
+        client = factory.return_value
+        client.remove_anonymous_access.return_value = False
+        with self.assertRaises(RuntimeError):
+            seaweedfs_deploy.delete_ow_storage(config)
+        client.force_bucket_remove.assert_not_called()
+        client.delete_user.assert_not_called()
+
+        client.reset_mock()
+        client.remove_anonymous_access.return_value = True
+        client.delete_user.return_value = True
+        self.assertTrue(seaweedfs_deploy.delete_ow_storage(config))
+        self.assertEqual(client.mock_calls, [
+            call.remove_anonymous_access("shared"),
+            call.force_bucket_remove("shared"),
+            call.delete_user("legacy"),
+        ])
+
+    @patch.object(seaweedfs_deploy, "SeaweedfsClient")
+    def test_failed_revoke_preserves_distinct_private_and_public_buckets(self, factory):
+        config = Mock()
+        config.get.side_effect = {
+            "namespace": "alpha",
+            "object-storage.data.enabled": True,
+            "object-storage.data.bucket": "alpha-data",
+            "object-storage.route.enabled": True,
+            "object-storage.route.bucket": "alpha-web",
+        }.get
+        client = factory.return_value
+        client.remove_anonymous_access.return_value = False
+        with self.assertRaises(RuntimeError):
+            seaweedfs_deploy.delete_ow_storage(config)
+        client.force_bucket_remove.assert_not_called()
+        client.delete_user.assert_not_called()
+
     @patch.object(seaweedfs_deploy.kube, "kubectl")
     def test_reconcile_legacy_grant_preserves_only_public_buckets(self, kubectl):
         kubectl.return_value = json.dumps({"items": [

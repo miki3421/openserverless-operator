@@ -242,18 +242,22 @@ def create_ow_storage(state, ucfg: UserConfig, user_metadata: UserMetadata, owne
 def delete_ow_storage(ucfg):
     seaweedfsClient = SeaweedfsClient()    
     namespace = ucfg.get("namespace")
+    data_bucket = ucfg.get('object-storage.data.bucket') if ucfg.get('object-storage.data.enabled') else None
+    route_bucket = ucfg.get('object-storage.route.bucket') if ucfg.get('object-storage.route.enabled') else None
 
-    if(ucfg.get('object-storage.data.enabled')):
-        bucket_name = ucfg.get('object-storage.data.bucket')
-        logging.info(f"*** removing private bucket {bucket_name} for {namespace}")
-        seaweedfsClient.force_bucket_remove(bucket_name)
+    # Revoke the public grant before deleting any bucket. A legacy
+    # configuration may use the same name for data and route storage.
+    if route_bucket:
+        logging.info(f"*** removing public bucket {route_bucket} for {namespace}")
+        if not seaweedfsClient.remove_anonymous_access(route_bucket):
+            raise RuntimeError(f"Could not revoke anonymous S3 access to bucket {route_bucket}; deletion stopped")
 
-    if(ucfg.get('object-storage.route.enabled')):
-        bucket_name = ucfg.get("object-storage.route.bucket")
-        logging.info(f"*** removing public bucket {bucket_name} for {namespace}")
-        if not seaweedfsClient.remove_anonymous_access(bucket_name):
-            raise RuntimeError(f"Could not revoke anonymous S3 access to bucket {bucket_name}; deletion stopped")
-        seaweedfsClient.force_bucket_remove(bucket_name)
+    if data_bucket:
+        logging.info(f"*** removing private bucket {data_bucket} for {namespace}")
+        seaweedfsClient.force_bucket_remove(data_bucket)
+
+    if route_bucket and route_bucket != data_bucket:
+        seaweedfsClient.force_bucket_remove(route_bucket)
 
     return seaweedfsClient.delete_user(namespace)
 
