@@ -96,9 +96,11 @@ spec:
             fieldRef:
               fieldPath: status.podIP
 
-        # Java options
+        # Three Kafka consumers share a blocking dispatcher. Keep one spare
+        # thread on single-CPU controllers; retain CPU-based scaling above this floor.
+        # Explicit controller_java_opts remain last so administrators can override it.
         - name: "JAVA_OPTS"
-          value: "{{controller_java_opts}} "
+          value: "-Ddispatchers.kafka-dispatcher.thread-pool-executor.core-pool-size-min=4 {{controller_java_opts}} "
 
         # specific controller arguments
         - name: "CONTROLLER_OPTS"
