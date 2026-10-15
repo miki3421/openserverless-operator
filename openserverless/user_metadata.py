@@ -54,20 +54,20 @@ class UserMetadata:
             self.add_quota("POSTGRES",ucfg.get("postgres.quota"))             
 
     def dump(self):
-        logging.debug(json.dumps(self._data))
+        logging.debug("user metadata keys: %s", [item["key"] for item in self._data["metadata"]])
 
     def add_metadata(self, key: str, value: str):
         """
         append an entry to the metadata with this structure {"key":key, "value":value}
         """
-        logging.debug(f"adding ({key}={value})")
+        logging.debug("adding metadata/quota key %s", key)
         self._data['metadata'].append({"key":key, "value":value})
 
     def add_quota(self, key: str, value: str):
         """
         append an entry to the quota with this structure {"key":key, "value":value}
         """
-        logging.debug(f"adding ({key}={value})")
+        logging.debug("adding metadata/quota key %s", key)
         self._data['quota'].append({"key":key, "value":value})        
 
     def get_metadata(self):

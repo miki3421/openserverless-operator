@@ -17,7 +17,7 @@
 #
 import logging, time
 import openserverless.openwhisk as openwhisk
-import openserverless.ferretdb as ferretdb
+import openserverless.mongodb_native as ferretdb
 import openserverless.redis as redis
 import openserverless.cronjob as cron
 import openserverless.storage_static as static

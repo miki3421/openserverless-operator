@@ -38,7 +38,10 @@ def create(owner=None):
         "image": image,
         "schedule": schedule,
         "name": "quota-checker",
-        "redis_password": password
+        "redis_password": password,
+        "mongodb_enabled": "true" if cfg.get("components.mongodb") else "false",
+        "postgres_enabled": "true" if cfg.get("components.postgres") else "false",
+        "redis_enabled": "true" if cfg.get("components.redis") else "false"
     }
     
     try: 
@@ -102,4 +105,4 @@ def patch(status, action, owner=None):
         logging.info(f"*** hanlded request to {action} quota") 
     except Exception as e:
         logging.error('*** failed to update quota: %s' % e)
-        operator_util.patch_operator_status(status,'quota','error')       
+        operator_util.patch_operator_status(status,'quota','error')

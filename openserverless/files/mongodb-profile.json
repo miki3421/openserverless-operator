@@ -1,0 +1,10 @@
+{
+  "backend": "mongodb-native",
+  "expected_version": "9.0.2",
+  "image": "docker.io/library/mongo:9.0.2@sha256:bac22ea7710d774103dcad3ec8ac13cba1eb378f488e3ce8a6b3a1adf2ba9dcc",
+  "replica_set": "ops-mongodb",
+  "volume_mount": "/data/db",
+  "secret": "openserverless-mongodb-auth",
+  "database_suffix": "",
+  "wired_tiger_cache_gib": "0.25"
+}

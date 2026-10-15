@@ -22,13 +22,15 @@ import json
 from pymongo import MongoClient
 from common.command_data import CommandData
 from bson import ObjectId
+from bson.json_util import default as bson_default
 
 class JSONEncoder(json.JSONEncoder):
   def default(self, obj):
     if isinstance(obj, ObjectId):
       return str(obj)  # Convert ObjectId to string
 
-    return super().default(obj)
+    # Replica-set replies include BSON timestamps and cluster metadata.
+    return bson_default(obj)
 
 class FerretDB():
     """
@@ -55,13 +57,17 @@ class FerretDB():
         Get a reference to the connected user database
         """
         client = MongoClient(self._mdb_url)
-        return client[self._db]
+        return client.get_default_database()
 
 
     def _send_command(self,input:CommandData):
-        print(f"inside ferretdb _send_command {json.dumps(input.get_raw_data())}")        
+        # Raw commands can contain passwords or application data.
+        print("executing MongoDB command")
         db = self._get_db()
-        response = db.command(input.get_raw_data())
+        try:
+            response = db.command(input.get_raw_data())
+        finally:
+            db.client.close()
 
         if response:
             json_output = json.dumps(response, cls=JSONEncoder, indent=2)

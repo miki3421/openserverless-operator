@@ -24,7 +24,7 @@ import openserverless.redis as redis
 import openserverless.couchdb as couchdb
 import openserverless.openwhisk as openwhisk
 import openserverless.cronjob as cron
-import openserverless.ferretdb as ferretdb
+import openserverless.mongodb_native as ferretdb
 import openserverless.issuer as issuer
 import openserverless.endpoint as endpoint
 import openserverless.zookeeper as zookeeper
@@ -184,7 +184,7 @@ def whisk_create(spec, name, **kwargs):
     else:
         state['static'] = "off"
 
-    if cfg.get('components.postgres') or cfg.get('components.mongodb'):
+    if cfg.get('components.postgres'):
         msg = postgres.create(owner)
         logging.info(msg)
         state['postgres'] = "on"

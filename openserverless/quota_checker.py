@@ -25,6 +25,22 @@ FERRRET_DB_QUOTA_ANNOTATION = "ferret_db_quota_reached"
 POSTGRES_DB_QUOTA_ANNOTATION = "postgres_db_quota_reached"
 REDIS_DB_QUOTA_ANNOTATION = "redis_db_quota_reached"
 
+def check_mongo_quota(client, users):
+    from openserverless.mongodb_client import tenant_names
+    for wsku in users:
+        spec=wsku["spec"]
+        mongo=spec.get("mongodb",{})
+        if not mongo.get("enabled") or mongo.get("quota") is None:
+            continue
+        limit=None if mongo["quota"] == "auto" else int(mongo["quota"])*1024*1024
+        if limit is not None and limit<=0:
+            raise ValueError("MongoDB quota must be a positive number of MiB")
+        user,database=tenant_names(spec["namespace"],mongo["database"])
+        reached=limit is not None and client.usage(database)>=limit
+        # Reconcile roles as well as the annotation after any interrupted run.
+        client.set_readonly(user,database,reached)
+        annotate(wsku["metadata"]["name"],f"{FERRRET_DB_QUOTA_ANNOTATION}={str(reached).lower()}")
+
 def annotate(wsku_name, keyval):
     """
     Annotate in overwrite mode a wksu resource with the specified key=value input param.
@@ -42,7 +58,7 @@ def get_wsk_users(jsonpath,namespace="openserverless"):
     return: an array of mathching record or emtpy [] if none is found
     """
     logging.info(f"querying wsku entries matching {jsonpath}")
-    users = kube.kubectl("get", "wsku", namespace=namespace, jsonpath=jsonpath)
+    users = kube.kubectl("get", "wsku", namespace=namespace, jsonpath=jsonpath,debugresult=False)
     if(users):
         return users
 
@@ -193,23 +209,24 @@ def start():
     logging.basicConfig(level=logging.INFO)
     logging.info("****** OPENSERVERLESS Quota enforcer started *****")
 
-    pg_client = PostgresClient(os.environ.get("DATABASE_DB_HOST_NAME"), 
-                               5432, 
-                               os.environ.get("PG_USER"),
-                               os.environ.get("PG_PASSWORD"))
-    
-    redis_client = RedisClient(os.environ.get("REDIS_PASSWORD"))
-
-    pg_dbsize_list = pg_client.query_all_pg_database_size()
-
     pg_wsku = get_wsk_users("{.items[?(@.spec.postgres.quota != 'auto')]}")
-    check_pg_quota(pg_client,pg_dbsize_list, pg_wsku)
-
-    ferretdb_wsku = get_wsk_users("{.items[?(@.spec.mongodb.quota != 'auto')]}")
-    check_pg_quota(pg_client,pg_dbsize_list, ferretdb_wsku, True)
-
+    pg_wsku=[u for u in pg_wsku if u["spec"].get("postgres",{}).get("enabled") and u["spec"]["postgres"].get("quota") not in (None,"auto")]
+    if pg_wsku and os.environ.get("POSTGRES_ENABLED","true")!="false":
+        pg_client=PostgresClient(os.environ.get("DATABASE_DB_HOST_NAME"),5432,os.environ.get("PG_USER"),os.environ.get("PG_PASSWORD"))
+        check_pg_quota(pg_client,pg_client.query_all_pg_database_size(),pg_wsku)
+    if os.environ.get("MONGODB_ENABLED")=="true":
+        from openserverless.mongodb_native import admin_client
+        mongo_wsku=get_wsk_users("{.items[?(@.spec.mongodb.enabled == true)]}")
+        if any(u["spec"].get("mongodb",{}).get("enabled") and u["spec"]["mongodb"].get("quota") is not None for u in mongo_wsku):
+            client=admin_client()
+            try:
+                check_mongo_quota(client,mongo_wsku)
+            finally:
+                client.close()
     redis_wsku = get_wsk_users("{.items[?(@.spec.redis.quota != 'auto')]}")
-    check_redis_quota(redis_client, redis_wsku)
+    redis_wsku=[u for u in redis_wsku if u["spec"].get("redis",{}).get("enabled") and u["spec"]["redis"].get("quota") not in (None,"auto")]
+    if redis_wsku and os.environ.get("REDIS_ENABLED","true")!="false":
+        check_redis_quota(RedisClient(os.environ.get("REDIS_PASSWORD")),redis_wsku)
 
     logging.info("****** OPENSERVERLESS Quota enforcer ended *****")
 

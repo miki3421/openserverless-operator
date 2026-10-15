@@ -178,9 +178,9 @@ def create_db_user(ucfg: UserConfig, user_metadata: UserMetadata):
         data["password"]=ucfg.get('mongodb.password')
         data["mode"]="create"
         
-        path_to_pgpass = postgres.render_postgres_script(f"{namespace}_ferretdb","pgpass_tpl.properties",data)
-        path_to_mdb_script = postgres.render_postgres_script(f"{namespace}_ferretdb","postgres_manage_user_tpl.sql",data)
-        pod_name = util.get_pod_name("{.items[?(@.metadata.labels.app == 'openserverless-postgres')].metadata.name}")      
+        path_to_pgpass = postgres.render_postgres_script(namespace,"pgpass_tpl.properties",data)
+        path_to_mdb_script = postgres.render_postgres_script(namespace,"postgres_manage_user_tpl.sql",data)
+        pod_name = util.get_pod_name_by_selector("app=openserverless-postgres","{.items[?(@.metadata.labels.replicationRole == 'primary')].metadata.name}")
 
         if(pod_name):
             res = postgres.exec_psql_command(pod_name,path_to_mdb_script,path_to_pgpass)
@@ -205,9 +205,9 @@ def delete_db_user(namespace, database):
         data["username"]=f"{namespace}_ferretdb"
         data["mode"]="delete"
 
-        path_to_pgpass = postgres.render_postgres_script(f"{namespace}_ferretdb","pgpass_tpl.properties",data)
-        path_to_mdb_script = postgres.render_postgres_script(f"{namespace}_ferretdb","postgres_manage_user_tpl.sql",data)
-        pod_name = util.get_pod_name("{.items[?(@.metadata.labels.app == 'openserverless-postgres')].metadata.name}")
+        path_to_pgpass = postgres.render_postgres_script(namespace,"pgpass_tpl.properties",data)
+        path_to_mdb_script = postgres.render_postgres_script(namespace,"postgres_manage_user_tpl.sql",data)
+        pod_name = util.get_pod_name_by_selector("app=openserverless-postgres","{.items[?(@.metadata.labels.replicationRole == 'primary')].metadata.name}")
 
         if(pod_name):
             res = postgres.exec_psql_command(pod_name,path_to_mdb_script,path_to_pgpass)
@@ -216,4 +216,4 @@ def delete_db_user(namespace, database):
         return None
     except Exception as e:
         logging.error(f"failed to remove Ferretdb database {namespace} authorization id and key: {e}")
-        return None        
+        return None

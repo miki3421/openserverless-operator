@@ -61,7 +61,7 @@ def main(args):
     when submitting the command. Every specific provider will support specific request type and command.
     WARNING: the body will be received as base64 encoded string as this action will be deployed with --web raw enabled flag
     """
-    print(args)
+    # Request arguments include credentials and the impersonation header.
     headers = args['__ow_headers']
     if('x-impersonate-auth' not in headers):
         return build_error("invalid request, missing mandatory header: x-impersonate-auth")

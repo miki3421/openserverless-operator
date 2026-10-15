@@ -78,5 +78,5 @@ class UserConfig:
 
     def dump_config(self):
         for k in self.getall():
-            logging.debug(f"{k} = {self._config.get(k)}")
+            logging.debug("user configuration key %s", k)
 
