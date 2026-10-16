@@ -60,6 +60,24 @@ def _add_seaweedfs_user_metadata(ucfg: UserConfig, user_metadata:UserMetadata):
         logging.error(f"failed to build SEAWEEDFS metadata for {ucfg.get('namespace')}: {e}")
         return None 
 
+def _check_storage_compatibility(spec):
+    """Fresh 4.x installs only; never implicitly upgrade an existing volume."""
+    desired = next(item for item in spec['items']
+                   if item.get('kind') == 'StatefulSet' and item['metadata']['name'] == 'seaweedfs')
+    image = desired['spec']['template']['spec']['containers'][0]['image']
+    current = kube.kubectl('get', 'statefulset', 'seaweedfs', '--ignore-not-found', '-o', 'json')
+    if current.strip():
+        current_image = json.loads(current)['spec']['template']['spec']['containers'][0]['image']
+        if current_image != image:
+            raise RuntimeError('Existing SeaweedFS image differs; automatic data upgrades are disabled')
+        return
+    claims = [v['persistentVolumeClaim']['claimName']
+              for v in desired['spec']['template']['spec'].get('volumes', [])
+              if 'persistentVolumeClaim' in v]
+    for claim in claims:
+        if kube.kubectl('get', 'pvc', claim, '--ignore-not-found', '-o', 'json').strip():
+            raise RuntimeError('Existing SeaweedFS PVC without its StatefulSet; implicit data reuse is disabled')
+
 def create(owner=None):
     logging.info("*** configuring seaweedfs standalone")
 
@@ -72,6 +90,7 @@ def create(owner=None):
 
     kust = kus.patchTemplates("seaweedfs", tplp, data)
     spec = kus.kustom_list("seaweedfs", kust, templates=[], data=data)
+    _check_storage_compatibility(spec)
 
     if owner:
         kopf.append_owner_reference(spec['items'], owner)

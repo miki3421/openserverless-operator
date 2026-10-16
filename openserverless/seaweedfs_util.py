@@ -19,6 +19,7 @@
 # to perform various operations
 
 import logging
+import subprocess
 import re
 import openserverless.config as cfg
 import openserverless.template as ntp
@@ -86,14 +87,23 @@ class SeaweedfsClient:
                 raise SeaweedfsUnauthorizedException()
 
     def _exec_weed_command(self,command):
-        # the command is piped to weed shell via stdin, so it is never interpreted
-        # by a shell and no quoting or character filtering is needed. Only newlines
-        # are rejected, since they would be read as separate weed shell commands.
-        if not isinstance(command, str) or re.search(r"[\n\r]", command):
+        # weed shell also interprets semicolons as command separators.
+        if not isinstance(command, str) or re.search(r"[\n\r;]", command):
             raise ValueError("invalid characters in weed shell command")
-        logging.debug(f"executing command: {command} inside pod {self.pod_name}")
-        res = kube.kubectl("exec","-i",self.pod_name,"--","weed","shell",input=f"{command}\n")
-        return res                               
+        # Do not log command/output: s3.configure contains access credentials.
+        # SeaweedFS 4.x may succeed without stdout (quota/delete commands).
+        result = subprocess.run(
+            ["kubectl", "-n", "openserverless", "exec", "-i", self.pod_name,
+             "--", "weed", "shell"],
+            input=command + "\n", text=True, capture_output=True, timeout=60,
+        )
+        # Older shells can report an error while returning exit status zero.
+        if result.returncode or re.search(
+            r"(?im)^\s*(?:error:|unknown command:|error reading stdin:)",
+            result.stderr,
+        ):
+            raise RuntimeError("SeaweedFS administration command failed")
+        return True
 
     def make_bucket(self, bucket_name, quota_in_mb=None):
         """

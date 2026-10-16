@@ -33,7 +33,18 @@ spec:
     spec:
       containers:
         - name: seaweedfs
-          image: chrislusf/seaweedfs:3.97
+          image: docker.io/chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+          workingDir: /data
+          startupProbe:
+            httpGet:
+              path: /
+              port: 9090
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            periodSeconds: 2
           ports:
             - containerPort: 9000 # S3
             - containerPort: 9090 # Filer
