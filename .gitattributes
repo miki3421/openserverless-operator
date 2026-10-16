@@ -21,3 +21,5 @@
 *.ps1 text eol=crlf
 *.png binary
 *.jpg binary
+# Unified-diff context prefixes intentionally precede Go tabs and empty lines.
+images/milvus/zero-grace.patch -whitespace

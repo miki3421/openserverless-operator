@@ -19,49 +19,6 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: "openserverless-milvus-pulsarv3-recovery"
-  namespace: openserverless
-  labels:
-    app: pulsarv3
-    release: openserverless-milvus
-    cluster: openserverless-milvus-pulsarv3
-    component: recovery
-spec:
-  ports:
-  - name: http
-    port: 8000
-  clusterIP: None
-  selector:
-    app: pulsarv3
-    release: openserverless-milvus
-    component: recovery
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: "openserverless-milvus-pulsarv3-bookie"
-  namespace: openserverless
-  labels:
-    app: pulsarv3
-    release: openserverless-milvus
-    cluster: openserverless-milvus-pulsarv3
-    component: bookie
-spec:
-  ports:
-  - name: "bookie"
-    port: 3181
-  - name: http
-    port: 8000
-  clusterIP: None
-  selector:
-    app: pulsarv3
-    release: openserverless-milvus
-    component: bookie
-  publishNotReadyAddresses: true 
----
-apiVersion: v1
-kind: Service
-metadata:
   name: openserverless-milvus
   namespace: openserverless
   labels:
@@ -69,72 +26,17 @@ metadata:
     app.kubernetes.io/instance: openserverless-milvus
     component: "standalone"
 spec:
-  type: NodePort
+  type: ClusterIP
   ports:
     - name: milvus
       port: 19530
-      nodePort: 32530
       protocol: TCP
       targetPort: milvus
     - name: metrics
       protocol: TCP
       port: 9091
-      nodePort: 32531
       targetPort: metrics
   selector:
     app.kubernetes.io/name: milvus
     app.kubernetes.io/instance: openserverless-milvus
     component: "standalone"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: "openserverless-milvus-pulsarv3-zookeeper"
-  namespace: openserverless
-  labels:
-    app: pulsarv3
-    release: openserverless-milvus
-    cluster: openserverless-milvus-pulsarv3
-    component: zookeeper
-  annotations:
-    {}
-spec:
-  ports:
-    # prometheus needs to access /metrics endpoint
-    - name: http
-      port: 8000
-    - name: "follower"
-      port: 2888
-    - name: "leader-election"
-      port: 3888
-    - name: "client"
-      port: 2181
-  clusterIP: None
-  publishNotReadyAddresses: true
-  selector:
-    app: pulsarv3
-    release: openserverless-milvus
-    component: zookeeper
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: "openserverless-milvus-pulsarv3-broker"
-  namespace: openserverless
-  labels:
-    app: pulsarv3
-    release: openserverless-milvus
-    cluster: openserverless-milvus-pulsarv3
-    component: broker
-spec:
-  ports:
-  # prometheus needs to access /metrics endpoint
-  - name: http
-    port: 8080
-  - name: "pulsar"
-    port: 6650
-  clusterIP: None
-  selector:
-    app: pulsarv3
-    release: openserverless-milvus
-    component: broker        

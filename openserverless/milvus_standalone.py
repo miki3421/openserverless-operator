@@ -16,6 +16,8 @@
 # under the License.
 #
 import time
+import json
+import yaml
 
 import kopf, logging
 import openserverless.kube as kube
@@ -29,6 +31,17 @@ from openserverless.milvus_admin_client import MilvusAdminClient
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
 from openserverless.seaweedfs_util import SeaweedfsClient
+
+
+def _build_spec(data):
+    directory = 'milvus-slim' if data['slim'] else 'milvus'
+    config_file = 'milvus-cfg-slim-base.yaml' if data['slim'] else 'milvus-cfg-base.yaml'
+    # The operator's deploy PVC can retain files from older images. Explicitly
+    # exclude legacy Pulsar resources even when those files still exist there.
+    resources = [config_file, 'milvus.yaml', 'milvus-pvc.yaml', 'milvus-svc.yaml',
+                 'milvus-etcd-secret.yaml', 'milvus-s3-secret.yaml']
+    return kus.restricted_kustom_list(directory, patchEntries(data),
+                                      templates_filter=resources, data=data)
 
 
 def patchEntries(data: dict):
@@ -51,9 +64,9 @@ def patchEntries(data: dict):
                                   util.b64_encode(data['milvus_etcd_password']))
     
     kust += kus.patchGenericEntry("Secret", "openserverless-milvus-s3-secret", "/stringData/accesskey",
-                                  data['milvus_s3_username'])
+                                  json.dumps(data['milvus_s3_username']))
     kust += kus.patchGenericEntry("Secret", "openserverless-milvus-s3-secret", "/stringData/secretkey",
-                                  data['milvus_s3_password'])
+                                  json.dumps(data['milvus_s3_password']))
 
     
     kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus", "/spec/storageClassName",
@@ -61,22 +74,49 @@ def patchEntries(data: dict):
     kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus", "/spec/resources/requests/storage",
                                   f"{data['size']}Gi")
 
-    if not data["slim"]:
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-zookeeper", "/spec/storageClassName",
-                                    data['storageClass'])
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-zookeeper",
-                                    "/spec/resources/requests/storage", f"{data['zookeeper_size']}Gi")
-
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-bookie-journal", "/spec/storageClassName",
-                                    data['storageClass'])
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-bookie-journal",
-                                    "/spec/resources/requests/storage", f"{data['bookie_journal_size']}Gi")
-
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-bookie-ledgers", "/spec/storageClassName",
-                                    data['storageClass'])
-        kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-bookie-ledgers",
-                                    "/spec/resources/requests/storage", f"{data['bookie_ledgers_size']}Gi")
     return kust
+
+
+def _check_storage_compatibility(spec):
+    """Refuse implicit engine/WAL upgrades and orphaned persistent state."""
+    desired = next(item for item in spec['items'] if item.get('kind') == 'Deployment'
+                   and item['metadata']['name'] == 'openserverless-milvus-standalone')
+    current = kube.kubectl('get', 'deployment', desired['metadata']['name'],
+                           '--ignore-not-found', '-o', 'json')
+    config = kube.kubectl('get', 'configmap', 'openserverless-milvus',
+                          '--ignore-not-found', '-o', 'json')
+    if current.strip():
+        actual = json.loads(current)
+        if (actual['spec']['template']['spec']['containers'][0]['image'] !=
+                desired['spec']['template']['spec']['containers'][0]['image']):
+            raise RuntimeError('Existing Milvus image differs; automatic data upgrades are disabled')
+        if not config.strip():
+            raise RuntimeError('Existing Milvus deployment has no configuration; review its storage before proceeding')
+        wanted_cm = next(item for item in spec['items'] if item.get('kind') == 'ConfigMap'
+                         and item['metadata']['name'] == 'openserverless-milvus')
+        actual_cfg = yaml.safe_load(json.loads(config)['data']['default.yaml'])
+        wanted_cfg = yaml.safe_load(wanted_cm['data']['default.yaml'])
+        for section, key in [('etcd', 'rootPath'), ('minio', 'bucketName'),
+                             ('minio', 'rootPath'), ('mq', 'type')]:
+            if actual_cfg.get(section, {}).get(key) != wanted_cfg.get(section, {}).get(key):
+                raise RuntimeError('Existing Milvus storage or WAL differs; automatic data upgrades are disabled')
+        if (actual_cfg.get('woodpecker', {}).get('storage') !=
+                wanted_cfg.get('woodpecker', {}).get('storage')):
+            raise RuntimeError('Existing Milvus storage or WAL differs; automatic data upgrades are disabled')
+        def claims(deployment):
+            return [volume['persistentVolumeClaim']['claimName']
+                    for volume in deployment['spec']['template']['spec'].get('volumes', [])
+                    if 'persistentVolumeClaim' in volume]
+        if claims(actual) != claims(desired):
+            raise RuntimeError('Existing Milvus volume differs; implicit data reuse is disabled')
+        return
+    if config.strip():
+        raise RuntimeError('Existing Milvus configuration without its deployment; implicit metadata reuse is disabled')
+    for volume in desired['spec']['template']['spec'].get('volumes', []):
+        if 'persistentVolumeClaim' in volume:
+            claim = volume['persistentVolumeClaim']['claimName']
+            if kube.kubectl('get', 'pvc', claim, '--ignore-not-found', '-o', 'json').strip():
+                raise RuntimeError('Existing Milvus PVC without its deployment; implicit data reuse is disabled')
 
 
 def create(owner=None):
@@ -84,16 +124,14 @@ def create(owner=None):
     Deploys the milvus vector db in standalone mode.
     """
     data = util.get_milvus_config_data()
-    res = create_milvus_accounts(data)
     dir = "milvus"
+    if data['slim']:
+        dir += "-slim"
+    mspec = _build_spec(data)
+    _check_storage_compatibility(mspec)
+    res = create_milvus_accounts(data)
     if res:
-        if data['slim']:
-            dir += "-slim"
-        
         logging.info(f"*** creating a {dir} standalone instance")
-
-        kust = patchEntries(data)
-        mspec = kus.kustom_list(dir, kust, templates=[], data=data)
 
         if owner:
             kopf.append_owner_reference(mspec['items'], owner)

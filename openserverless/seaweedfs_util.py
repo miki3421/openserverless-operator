@@ -111,7 +111,16 @@ class SeaweedfsClient:
         """
         if not util.validate_bucket_name(bucket_name):
             raise ValueError(f"Invalid bucket name {bucket_name}")
-        res = util.check(self._exec_weed_command(f"s3.bucket.create -name {bucket_name}"),"make_bucket",True)
+        # SeaweedFS 4.x rejects duplicate creation. Check the private filer so
+        # reconciliation preserves existing objects and bucket permissions.
+        response = requests.head(f"{self.filer_url}/buckets/{bucket_name}/",
+                                 allow_redirects=False, timeout=10)
+        if response.status_code == 404:
+            res = util.check(self._exec_weed_command(f"s3.bucket.create -name {bucket_name}"),"make_bucket",True)
+        elif response.status_code == 200:
+            res = True
+        else:
+            raise RuntimeError("Could not determine whether the SeaweedFS bucket exists")
         if quota_in_mb:
             res = util.check(self._exec_weed_command(f"s3.bucket.quota -name {bucket_name} -op=set -sizeMB={quota_in_mb}"),"make_bucket",res)
         return res

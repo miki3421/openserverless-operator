@@ -57,6 +57,32 @@ class SeaweedShellTest(unittest.TestCase):
                 self.client._exec_weed_command(command)
         run.assert_not_called()
 
+    @patch('openserverless.seaweedfs_util.requests.head')
+    @patch.object(SeaweedfsClient, '_exec_weed_command', return_value=True)
+    def test_existing_bucket_is_reconciled_without_recreation(self, command, head):
+        self.client.filer_url = 'http://seaweedfs:9090'
+        head.return_value = Mock(status_code=200)
+        self.assertTrue(self.client.make_bucket('vectors', 1024))
+        command.assert_called_once_with('s3.bucket.quota -name vectors -op=set -sizeMB=1024')
+
+    @patch('openserverless.seaweedfs_util.requests.head')
+    @patch.object(SeaweedfsClient, '_exec_weed_command', return_value=True)
+    def test_missing_bucket_is_created(self, command, head):
+        self.client.filer_url = 'http://seaweedfs:9090'
+        head.return_value = Mock(status_code=404)
+        self.assertTrue(self.client.make_bucket('new-bucket'))
+        command.assert_called_once_with('s3.bucket.create -name new-bucket')
+
+    @patch('openserverless.seaweedfs_util.requests.head')
+    @patch.object(SeaweedfsClient, '_exec_weed_command')
+    def test_bucket_probe_error_fails_without_mutation(self, command, head):
+        self.client.filer_url = 'http://seaweedfs:9090'
+        for status in [301, 403, 500]:
+            head.return_value = Mock(status_code=status)
+            with self.assertRaises(RuntimeError):
+                self.client.make_bucket('vectors')
+        command.assert_not_called()
+
 
 class SeaweedStorageGuardTest(unittest.TestCase):
     def setUp(self):

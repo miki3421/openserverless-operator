@@ -1,0 +1,62 @@
+--- a/internal/proxy/task_query.go
++++ b/internal/proxy/task_query.go
+@@ -656,7 +656,7 @@
+ 		}
+ 		consistencyLevel = collectionInfo.ConsistencyLevel
+ 	}
+-	return consistencyLevel != commonpb.ConsistencyLevel_Strong
++	return consistencyLevel != commonpb.ConsistencyLevel_Strong && !zeroGraceBoundedConsistency(consistencyLevel)
+ }
+ 
+ func (t *queryTask) PreExecute(ctx context.Context) error {
+@@ -876,6 +876,12 @@
+ 			// parse from guarantee timestamp and user input consistency level
+ 			guaranteeTs = parseGuaranteeTsFromConsistency(guaranteeTs, t.BeginTs(), consistencyLevel)
+ 		}
++	}
++
++	// A zero grace window is strong consistency; use its native WAL fast path.
++	if zeroGraceBoundedConsistency(consistencyLevel) {
++		consistencyLevel = commonpb.ConsistencyLevel_Strong
++		t.ConsistencyLevel = consistencyLevel
+ 	}
+ 
+ 	// update actual consistency level
+--- a/internal/proxy/task_search.go
++++ b/internal/proxy/task_search.go
+@@ -156,7 +156,7 @@
+ 		}
+ 		consistencyLevel = collectionInfo.ConsistencyLevel
+ 	}
+-	return consistencyLevel != commonpb.ConsistencyLevel_Strong
++	return consistencyLevel != commonpb.ConsistencyLevel_Strong && !zeroGraceBoundedConsistency(consistencyLevel)
+ }
+ 
+ func (t *searchTask) PreExecute(ctx context.Context) error {
+@@ -312,6 +312,11 @@
+ 			// parse from guarantee timestamp and user input consistency level
+ 			guaranteeTs = parseGuaranteeTsFromConsistency(guaranteeTs, t.BeginTs(), consistencyLevel)
+ 		}
++	}
++
++	// A zero grace window is strong consistency; use its native WAL fast path.
++	if zeroGraceBoundedConsistency(consistencyLevel) {
++		consistencyLevel = commonpb.ConsistencyLevel_Strong
+ 	}
+ 
+ 	// update actual consistency level
+--- a/internal/proxy/util.go
++++ b/internal/proxy/util.go
+@@ -1297,6 +1297,12 @@
+ 
+ func ReplaceID2Name(oldStr string, id int64, name string) string {
+ 	return strings.ReplaceAll(oldStr, strconv.FormatInt(id, 10), name)
++}
++
++// zeroGraceBoundedConsistency identifies bounded reads with no tolerated staleness.
++// They need strong-read timestamp allocation and local WAL MVCC acceleration.
++func zeroGraceBoundedConsistency(level commonpb.ConsistencyLevel) bool {
++	return level == commonpb.ConsistencyLevel_Bounded && Params.CommonCfg.GracefulTime.GetAsDuration(time.Millisecond) == 0
+ }
+ 
+ func parseGuaranteeTsFromConsistency(ts, tMax typeutil.Timestamp, consistency commonpb.ConsistencyLevel) typeutil.Timestamp {

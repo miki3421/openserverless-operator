@@ -35,91 +35,50 @@ data:
     # or implied. See the License for the specific language governing permissions and limitations under the License.
 
     etcd:
-      rootPath: milvus
+      rootPath: milvus-v3
       auth:
         enabled: true
-        userName: root 
-        password: 0therPa55
+        userName: root
+        password: "replaced-by-operator"
       endpoints:
-      - openserverless-etcd-0.openserverless-etcd-headless.openserverless.svc.cluster.local:2379    
-
+      - openserverless-etcd-0.openserverless-etcd-headless.openserverless.svc.cluster.local:2379
     metastore:
-      type: etcd 
-         
+      type: etcd
     minio:
       address: seaweedfs
       port: 9000
-      accessKeyID: {{milvus_s3_username}}
-      secretAccessKey: {{milvus_s3_password}}
+      accessKeyID: "seaweedfsmilvus"
+      secretAccessKey: "replaced-by-operator"
       useSSL: false
       bucketName: vectors
-      rootPath: files
+      rootPath: milvus-v3
       useIAM: false
       useVirtualHost: false
-
     mq:
-      type: rocksmq    
-    
-    messageQueue: rocksmq 
-        
+      type: woodpecker
+    woodpecker:
+      logstore:
+        segmentSyncPolicy:
+          maxIntervalForLocalStorage: 1ms
+      storage:
+        type: local
+        rootPath: /var/lib/milvus/woodpecker
     rootCoord:
-      address: localhost
-      port: 53100
-      enableActiveStandby: false  # Enable rootcoord active-standby
-      maxDatabaseNum: {{milvus_max_database_num}}
-    
+      maxDatabaseNum: 64
     proxy:
+      # Publish WAL visibility frequently for immediate post-write reads.
+      timeTickInterval: 10
       port: 19530
-      internalPort: 19529
-      maxRoleNum: {{milvus_max_role_num}}
-      maxUserNum: {{milvus_max_user_num}}
-    
-    queryCoord:
-      address: localhost
-      port: 19531
-    
-      enableActiveStandby: false  # Enable querycoord active-standby
-    
-    queryNode:
-      port: 21123
-      enableDisk: true # Enable querynode load disk index, and search on disk index
-    
-    indexCoord:
-      address: localhost
-      port: 31000
-      enableActiveStandby: false  # Enable indexcoord active-standby
-    
-    indexNode:
-      port: 21121
-      enableDisk: true # Enable index node build disk vector index
-    
-    dataCoord:
-      address: localhost
-      port: 13333
-      enableActiveStandby: false  # Enable datacoord active-standby
-    
-    dataNode:
-      port: 21124
-    
+      maxRoleNum: 100
+      maxUserNum: 100
     log:
       level: info
       file:
         rootPath: ""
-        maxSize: 300
-        maxAge: 10
-        maxBackups: 20
       format: text
   user.yaml: |-
-    #    For example enable rest http for milvus proxy
-    #    proxy:
-    #      http:
-    #        enabled: true
-    #      maxUserNum: 100
-    #      maxRoleNum: 10
-    ##  Enable tlsMode and set the tls cert and key
-    #  tls:
-    #    serverPemPath: /etc/milvus/certs/tls.crt
-    #    serverKeyPath: /etc/milvus/certs/tls.key
-    #   common:
-    #     security:
-    #       tlsMode: 1
+    common:
+      gracefulTime: 0
+      security:
+        authorizationEnabled: true
+        defaultRootPassword: "replaced-by-operator"
