@@ -19,7 +19,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: openserverless-milvus
+  name: openserverless-milvus-etcd37
   namespace: openserverless
   labels:
     app.kubernetes.io/name: milvus

@@ -46,6 +46,9 @@ spec:
       annotations:        
         whisks.openserverless.org/annotate-version: "true"                       
     spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
       serviceAccountName: default
       automountServiceAccountToken: false
       initContainers:
@@ -109,6 +112,9 @@ spec:
           {}
         env:
         volumeMounts:
+        - name: etcd-client-tls
+          mountPath: /etc/etcd/client
+          readOnly: true
         - mountPath: /milvus/tools
           name: tools
         - name: milvus-config
@@ -123,6 +129,10 @@ spec:
           mountPath: "/var/lib/milvus"
           subPath: 
       volumes:
+      - name: etcd-client-tls
+        secret:
+          secretName: openserverless-etcd-client-tls-v37
+          defaultMode: 0440
       - emptyDir: {}
         name: tools
       - name: milvus-config
@@ -130,4 +140,4 @@ spec:
           name: openserverless-milvus
       - name: milvus-data-disk
         persistentVolumeClaim:
-          claimName: openserverless-milvus
+          claimName: openserverless-milvus-etcd37

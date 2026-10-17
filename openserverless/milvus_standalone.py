@@ -69,9 +69,9 @@ def patchEntries(data: dict):
                                   json.dumps(data['milvus_s3_password']))
 
     
-    kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus", "/spec/storageClassName",
+    kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-etcd37", "/spec/storageClassName",
                                   data['storageClass'])
-    kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus", "/spec/resources/requests/storage",
+    kust += kus.patchGenericEntry("PersistentVolumeClaim", "openserverless-milvus-etcd37", "/spec/resources/requests/storage",
                                   f"{data['size']}Gi")
 
     return kust
@@ -96,7 +96,7 @@ def _check_storage_compatibility(spec):
                          and item['metadata']['name'] == 'openserverless-milvus')
         actual_cfg = yaml.safe_load(json.loads(config)['data']['default.yaml'])
         wanted_cfg = yaml.safe_load(wanted_cm['data']['default.yaml'])
-        for section, key in [('etcd', 'rootPath'), ('minio', 'bucketName'),
+        for section, key in [('etcd', 'rootPath'), ('etcd', 'ssl'), ('etcd', 'endpoints'), ('minio', 'bucketName'),
                              ('minio', 'rootPath'), ('mq', 'type')]:
             if actual_cfg.get(section, {}).get(key) != wanted_cfg.get(section, {}).get(key):
                 raise RuntimeError('Existing Milvus storage or WAL differs; automatic data upgrades are disabled')

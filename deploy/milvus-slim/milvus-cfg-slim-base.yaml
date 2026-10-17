@@ -35,7 +35,13 @@ data:
     # or implied. See the License for the specific language governing permissions and limitations under the License.
 
     etcd:
-      rootPath: milvus-v3
+      rootPath: milvus-etcd-v37
+      ssl:
+        enabled: true
+        tlsCert: /etc/etcd/client/tls.crt
+        tlsKey: /etc/etcd/client/tls.key
+        tlsCACert: /etc/etcd/client/ca.crt
+        tlsMinVersion: "1.3"
       auth:
         enabled: true
         userName: root
@@ -51,7 +57,7 @@ data:
       secretAccessKey: "replaced-by-operator"
       useSSL: false
       bucketName: vectors
-      rootPath: milvus-v3
+      rootPath: milvus-etcd-v37
       useIAM: false
       useVirtualHost: false
     mq:

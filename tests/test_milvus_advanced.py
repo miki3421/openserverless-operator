@@ -62,7 +62,8 @@ class MilvusStorageTest(unittest.TestCase):
     @patch.object(milvus.kube, 'kubectl')
     def test_wal_and_metadata_changes_refused(self, command):
         for section, key, value in [('mq', 'type', 'rocksmq'), ('etcd', 'rootPath', 'milvus'),
-                                    ('minio', 'rootPath', 'files')]:
+                                    ('minio', 'rootPath', 'files'), ('etcd', 'ssl', {'enabled': True}),
+                                    ('etcd', 'endpoints', ['new-cluster:2379'])]:
             old = copy.deepcopy(self.cm)
             config = yaml.safe_load(old['data']['default.yaml'])
             config[section][key] = value
@@ -124,6 +125,10 @@ class MilvusRenderTest(unittest.TestCase):
             deployment = next(item for item in spec['items'] if item['kind'] == 'Deployment')
             pod = deployment['spec']['template']['spec']
             self.assertFalse(pod['automountServiceAccountToken'])
+            self.assertEqual(pod['securityContext']['fsGroup'],999)
+            tls=next(v for v in pod['volumes'] if v['name']=='etcd-client-tls')
+            self.assertEqual(tls['secret']['secretName'],'openserverless-etcd-client-tls-v37')
+            self.assertEqual(tls['secret']['defaultMode'],0o440)
             self.assertNotIn('emptyDir', next(v for v in pod['volumes'] if v['name'] == 'milvus-data-disk'))
             cm = next(item for item in spec['items'] if item['kind'] == 'ConfigMap')
             config = yaml.safe_load(cm['data']['default.yaml'])
@@ -132,7 +137,8 @@ class MilvusRenderTest(unittest.TestCase):
             self.assertEqual(config['woodpecker']['logstore']['segmentSyncPolicy']['maxIntervalForLocalStorage'], '1ms')
             self.assertEqual(config['proxy']['timeTickInterval'], 10)
             self.assertEqual(config['minio']['secretAccessKey'], 'test: #quoted')
-            self.assertEqual(config['etcd']['rootPath'], 'milvus-v3')
+            self.assertEqual(config['etcd']['rootPath'], 'milvus-etcd-v37')
+            self.assertTrue(config['etcd']['ssl']['enabled'])
             self.assertEqual(len(config['etcd']['endpoints']), 3)
             user = yaml.safe_load(cm['data']['user.yaml'])
             self.assertTrue(user['common']['security']['authorizationEnabled'])

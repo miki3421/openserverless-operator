@@ -91,7 +91,7 @@ RUN echo "Installing poetry" && \
     # Install minimal dependencies
     echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get update && apt-get install -y --no-install-recommends \
-    curl zip unzip && \
+    curl zip unzip openssl && \
     curl -sSL https://install.python-poetry.org | python - && \
     cd /home/openserverless && poetry install --no-root --no-interaction --no-ansi && rm -rf $POETRY_CACHE_DIR
 
@@ -122,7 +122,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     # Install minimal dependencies
     echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get update && apt-get install -y --no-install-recommends \
-    curl zip unzip && \
+    curl zip unzip openssl && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     # install kubectl
     KVER="v1.23.0" && \

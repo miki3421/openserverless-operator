@@ -18,41 +18,135 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: openserverless-etcd
-  namespace: openserverless
+  name: {{name}}
+  namespace: {{namespace}}
   labels:
-    app.kubernetes.io/name: openserverless-etcd    
+    app.kubernetes.io/name: {{name}}
+    ops.openserverless.org/etcd-layout: v37
 spec:
   replicas: {{etcd_replicas}}
-  serviceName: openserverless-etcd-headless
+  serviceName: {{name}}-headless
+  podManagementPolicy: Parallel
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
-      app.kubernetes.io/name: openserverless-etcd      
+      app.kubernetes.io/name: {{name}}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: openserverless-etcd        
-      annotations:
-        serviceName: openserverless-etcd
+        name: {{name}}
+        app.kubernetes.io/name: {{name}}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+      terminationGracePeriodSeconds: 30
       containers:
       - name: {{container}}
-        env:
-        - name: ETCD_INITIAL_CLUSTER
-          value: {{etc_initial_cluster}}
-        - name: ETCD_AUTO_COMPACTION_RETENTION
-          value: "{{etcd_auto_compaction_retention}}"
-        - name: ETCD_QUOTA_BACKEND_BYTES
-          value: "{{etcd_quota_backend_bytes}}"
-        image: docker.io/bitnamilegacy/etcd:3.5.17-debian-12-r0
+        image: {{image | tojson}}
         imagePullPolicy: IfNotPresent
-  volumeClaimTemplates:
-    - metadata:
-        name: openserverless-etc-data
-      spec:
-        accessModes:
-          - "ReadWriteOnce"
-        storageClassName: {{storageClass}}
+        command: [/usr/local/bin/etcd]
+        args:
+        - --name=$(POD_NAME)
+        - --data-dir=/var/lib/etcd/data
+        - --listen-client-urls=https://0.0.0.0:2379
+        - --advertise-client-urls=https://$(POD_NAME).{{name}}-headless.{{namespace}}.svc.cluster.local:2379
+        - --listen-peer-urls=https://0.0.0.0:2380
+        - --initial-advertise-peer-urls=https://$(POD_NAME).{{name}}-headless.{{namespace}}.svc.cluster.local:2380
+        - --initial-cluster={{etc_initial_cluster}}
+        - --initial-cluster-token=ops-etcd-v37-{{name}}
+        - --initial-cluster-state=new
+        - --auto-compaction-mode=periodic
+        - --auto-compaction-retention={{etcd_auto_compaction_retention}}
+        - --quota-backend-bytes={{etcd_quota_backend_bytes}}
+        - --cert-file=/etc/etcd/server/tls.crt
+        - --key-file=/etc/etcd/server/tls.key
+        - --trusted-ca-file=/etc/etcd/server/ca.crt
+        - --client-cert-auth=true
+        - --peer-cert-file=/etc/etcd/server/tls.crt
+        - --peer-key-file=/etc/etcd/server/tls.key
+        - --peer-trusted-ca-file=/etc/etcd/server/ca.crt
+        - --peer-client-cert-auth=true
+        - --tls-min-version=TLS1.3
+        - --auth-token=jwt,priv-key=/etc/etcd/server/jwt.key,sign-method=RS256,ttl=10m
+        - --log-level=info
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPS_ETCD_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{name}}-secret
+              key: rootPassword
+        - name: ETCDCTL_USER
+          value: root:$(OPS_ETCD_ROOT_PASSWORD)
+        - name: ETCDCTL_ENDPOINTS
+          value: https://127.0.0.1:2379
+        - name: ETCDCTL_CACERT
+          value: /etc/etcd/client/ca.crt
+        - name: ETCDCTL_CERT
+          value: /etc/etcd/client/tls.crt
+        - name: ETCDCTL_KEY
+          value: /etc/etcd/client/tls.key
+        ports:
+        - {name: client, containerPort: 2379}
+        - {name: peer, containerPort: 2380}
+        startupProbe:
+          exec:
+            command: [/usr/local/bin/ops-etcd-health]
+          periodSeconds: 2
+          timeoutSeconds: 5
+          failureThreshold: 150
+        readinessProbe:
+          exec:
+            command: [/usr/local/bin/ops-etcd-health]
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 2
+        livenessProbe:
+          exec:
+            command: [/usr/local/bin/ops-etcd-health]
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
         resources:
           requests:
-            storage: "{{size}}Gi"              
+            cpu: {{container_cpu_req | tojson}}
+            memory: {{container_mem_req | tojson}}
+          limits:
+            memory: {{container_mem_lim | tojson}}
+        volumeMounts:
+        - {name: etcd-data-v37, mountPath: /var/lib/etcd}
+        - {name: server-tls, mountPath: /etc/etcd/server, readOnly: true}
+        - {name: client-tls, mountPath: /etc/etcd/client, readOnly: true}
+      volumes:
+      - name: server-tls
+        secret:
+          secretName: {{name}}-server-tls-v37
+          defaultMode: 0440
+      - name: client-tls
+        secret:
+          secretName: {{name}}-client-tls-v37
+          defaultMode: 0440
+  volumeClaimTemplates:
+  - metadata:
+      name: etcd-data-v37
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: {{storageClass | tojson}}
+      resources:
+        requests:
+          storage: {{(size|string + 'Gi') | tojson}}
