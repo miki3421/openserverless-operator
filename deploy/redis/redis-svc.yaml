@@ -22,10 +22,9 @@ metadata:
   name: redis
   namespace: openserverless
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     name: redis
   ports:   
     - port: 6379
       targetPort: 6379
-      nodePort: 30379

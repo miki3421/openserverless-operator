@@ -489,7 +489,7 @@ def get_redis_config_data():
         "applypodsecurity":get_enable_pod_security(),
         "name": "redis",
         "container": "redis",
-        "dir": "/bitnami/redis/data",
+        "dir": "/data",
         "size": cfg.get("redis.volume-size", "REDIS_VOLUME_SIZE", 10),
         "storageClass": cfg.get("openserverless.storageclass"),
         "redis_password":cfg.get("redis.default.password") or "s0meP@ass3",

@@ -16,234 +16,262 @@
 # under the License.
 #
 
-import openserverless.kustomize as kus
-import openserverless.kube as kube
+import base64
+import hashlib
+import json
+import logging
+import re
+import subprocess
+import urllib.parse
+
+import kopf
+import redis as redislib
+import yaml
+
 import openserverless.config as cfg
+import openserverless.kube as kube
 import openserverless.template as ntp
 import openserverless.util as util
 import openserverless.openwhisk as openwhisk
-import urllib.parse
-import os, os.path
-import logging, json
-import kopf
 import openserverless.operator_util as operator_util
-
+from openserverless.redis_acl import tenant_rules
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
 
+IMAGE = 'docker.io/library/redis:8.10.2@sha256:2c2dff791878316e3b083188be0d578423b24813cdda5de0e80ea4f7b3e6bfd6'
+SERVICE_NAME = 'redis'
+ADMIN_USER = 'ops-admin'
+LAYOUT = 'v810'
 
-def _add_redis_user_metadata(ucfg: UserConfig, user_metadata:UserMetadata):
-    """
-    adds an entry for the redis connectivity, i.e
-    something like "redis://{namespace}:{auth}@redis"}
-    """ 
 
-    try:
-        redis_service =  util.get_service("{.items[?(@.spec.selector.name == 'redis')]}")
-        if(redis_service):
-            redis_service_name = redis_service['metadata']['name']
-            redis_service_port = redis_service['spec']['ports'][0]['port']            
-            username = urllib.parse.quote(ucfg.get('namespace'))
-            password = urllib.parse.quote(ucfg.get('redis.password'))
-            auth = f"{username}:{password}"
-            redis_url = f"redis://{auth}@{redis_service_name}:{redis_service_port}"
-            redis_alt_url = f"redis://{password}@{redis_service_name}:{redis_service_port}"
-            user_metadata.add_metadata("REDIS_URL",redis_url)
-            user_metadata.add_metadata("REDIS_ALT_URL",redis_alt_url)
-            user_metadata.add_metadata("REDIS_SERVICE",redis_service_name)
-            user_metadata.add_metadata("REDIS_PORT",redis_service_port)
-            user_metadata.add_metadata("REDIS_PROVIDER","valkey")
-            user_metadata.add_metadata("REDIS_PASSWORD",ucfg.get('redis.password'))           
-        return None
-    except Exception as e:
-        logging.error(f"failed to build redis_url for {ucfg.get('namespace')}: {e}")
-        return None 
+def _json(kind, name):
+    raw = kube.kubectl('get', kind, name, '--ignore-not-found', '-o', 'json')
+    return json.loads(raw) if raw.strip() else None
+
+
+def _build_spec(data):
+    data = dict(data)
+    data['image'] = IMAGE
+    data['persistence'] = bool(data['persistence'])
+    data['maxmemory'] = str(data['maxmemory'])
+    if not re.fullmatch(r'[0-9]+(?:[kKmMgG][bB]?)?', data['maxmemory']):
+        raise ValueError('Invalid Redis memory limit')
+    sts = yaml.safe_load(ntp.expand_template('redis-set.yaml', data))
+    if data.get('affinity') or data.get('tolerations'):
+        scheduling = yaml.safe_load(ntp.expand_template('affinity-tolerance-sts-core-attach.yaml', data))
+        sts['spec']['template']['spec'].update(scheduling['spec']['template']['spec'])
+    cm = yaml.safe_load(ntp.expand_template('redis-conf.yaml', data))
+    svc = {'apiVersion':'v1', 'kind':'Service',
+           'metadata':{'name':data['name'],'namespace':'openserverless'},
+           'spec':{'type':'ClusterIP','selector':{'name':data['name']},
+                   'ports':[{'name':'redis','port':6379,'targetPort':'redis'}]}}
+    return {'apiVersion':'v1','kind':'List','items':[sts,cm,svc]}
+
+
+def _check_storage_compatibility(spec, data):
+    wanted = spec['items'][0]
+    actual = _json('sts', data['name'])
+    secret = _json('secret', data['name']+'-admin-v810')
+    if actual:
+        a = actual['spec']; w = wanted['spec']
+        if a['template']['spec']['containers'][0]['image'] != IMAGE:
+            raise RuntimeError('Existing Redis image differs; implicit data upgrades are disabled')
+        if actual['metadata'].get('labels',{}).get('ops.openserverless.org/redis-layout') != LAYOUT:
+            raise RuntimeError('Existing Redis layout differs; implicit data reuse is disabled')
+        def claims(s):
+            return [(c['metadata']['name'], c['spec'].get('storageClassName'),
+                     c['spec']['resources']['requests']['storage']) for c in s['volumeClaimTemplates']]
+        if a['replicas'] != 1 or claims(a) != claims(w):
+            raise RuntimeError('Existing Redis volume differs; implicit data reuse is disabled')
+        cm = _json('cm', data['name']+'-cm')
+        if not cm or not secret:
+            raise RuntimeError('Existing Redis configuration or credentials are missing; refusing reset')
+        wanted_cm = spec['items'][1]
+        def storage_directives(config):
+            return [line.strip() for line in config.splitlines()
+                    if line.strip().startswith(('dir ', 'aclfile ', 'appendonly ', 'appenddirname ', 'dbfilename ', 'save '))]
+        if storage_directives(cm['data']['redis-conf']) != storage_directives(wanted_cm['data']['redis-conf']):
+            raise RuntimeError('Existing Redis persistence differs; implicit changes are disabled')
+    else:
+        claims = json.loads(kube.kubectl('get','pvc','-o','json'))['items']
+        if any(p['metadata']['name'].startswith('redis-data-v810-'+data['name']+'-') for p in claims):
+            raise RuntimeError('Existing Redis PVC without its StatefulSet; implicit data reuse is disabled')
+    if secret:
+        expected = base64.b64encode(data['redis_password'].encode()).decode()
+        if secret.get('data',{}).get('password') != expected:
+            raise RuntimeError('Existing Redis credentials differ; implicit password rotation is disabled')
+
+
+def _ensure_security(data, owner=None):
+    name = data['name']+'-admin-v810'
+    existing = _json('secret', name)
+    if existing:
+        if not all(existing.get('data',{}).get(k) for k in ['password','users.acl']):
+            raise RuntimeError('Incomplete Redis bootstrap credentials; refusing reset')
+        return
+    password = data['redis_password']
+    if not password:
+        raise ValueError('Redis administrator password is required')
+    digest = hashlib.sha256(password.encode()).hexdigest()
+    acl = 'user default off resetpass resetkeys resetchannels -@all\n'
+    acl += f'user {ADMIN_USER} on #{digest} ~* &* +@all\n'
+    secret = {'apiVersion':'v1','kind':'Secret','type':'Opaque',
+              'metadata':{'name':name,'namespace':'openserverless'},
+              'data':{k:base64.b64encode(v.encode()).decode() for k,v in
+                      {'password':password,'users.acl':acl}.items()}}
+    if owner: kopf.append_owner_reference([secret],owner)
+    result = subprocess.run(['kubectl','-n','openserverless','apply','-f','-'],
+                            input=json.dumps(secret),text=True,capture_output=True,timeout=30)
+    if result.returncode:
+        raise RuntimeError('Could not apply Redis credentials')
+
+
+def admin_client(password=None):
+    secret = _json('secret', SERVICE_NAME+'-admin-v810')
+    if not secret: raise RuntimeError('Redis administrator credentials are missing')
+    stored = base64.b64decode(secret['data']['password']).decode()
+    if password is not None and password != stored:
+        raise RuntimeError('Redis administrator credentials do not match')
+    return redislib.Redis(host=SERVICE_NAME,port=6379,username=ADMIN_USER,password=stored,
+                         decode_responses=True,socket_timeout=10,socket_connect_timeout=5)
+
+
+def _username(username):
+    if not isinstance(username,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',username) or username in ('default',ADMIN_USER):
+        raise ValueError('Invalid Redis tenant name')
+    return username
+
+
+def _prefix(prefix):
+    if not isinstance(prefix,str) or not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,200}',prefix):
+        raise ValueError('Invalid Redis tenant prefix')
+    return prefix if prefix.endswith(':') else prefix+':'
+
+
+def _rules(prefix, readonly=False):
+    return tenant_rules(prefix, readonly)
+
+
+def _assert_prefix_available(client, username, prefix):
+    for user in client.acl_users():
+        if user in ('default',ADMIN_USER): continue
+        actual = client.acl_getuser(user)
+        keys = actual.get('keys',[])
+        if isinstance(keys,str): keys=keys.split()
+        for key in keys:
+            if not key.startswith('~') or not key.endswith(':*') or any(c in key[1:-1] for c in '*?[]\\'):
+                raise RuntimeError('Unmanaged Redis key grant; refusing ambiguous tenant isolation')
+            current = key[1:-1]
+            if user == username:
+                if current != prefix: raise RuntimeError('Redis tenant prefix change requires explicit migration')
+            elif current.startswith(prefix) or prefix.startswith(current):
+                raise RuntimeError('Redis tenant prefix overlaps another tenant')
+        if actual.get('selectors'):
+            raise RuntimeError('Unmanaged Redis ACL selectors; refusing ambiguous tenant isolation')
+
+
+def provision_user(username, password, prefix, readonly=False):
+    username=_username(username);prefix=_prefix(prefix)
+    if not isinstance(password,str) or not password: raise ValueError('Redis tenant password is required')
+    digest=hashlib.sha256(password.encode()).hexdigest()
+    with admin_client() as client, client.lock('__ops_acl_lock__', timeout=120, blocking_timeout=15):
+        _assert_prefix_available(client,username,prefix)
+        old=client.acl_getuser(username)
+        if old is None and next(client.scan_iter(match=prefix+'*', count=100), None) is not None:
+            raise RuntimeError('Orphaned Redis tenant data; explicit cleanup is required before prefix reuse')
+        changed_password=bool(old and old.get('passwords') != [digest])
+        client.execute_command('ACL','SETUSER',username,'reset','on','#'+digest,*_rules(prefix,readonly))
+        try: client.acl_save()
+        except redislib.RedisError:
+            # Never leave an unsaved tenant grant active after reporting failure.
+            client.acl_deluser(username)
+            raise RuntimeError('Could not persist Redis tenant ACL') from None
+        if changed_password: client.execute_command('CLIENT','KILL','USER',username,'SKIPME','yes')
+    return True
+
+
+def set_user_readonly(username, prefix, readonly):
+    username=_username(username);prefix=_prefix(prefix)
+    with admin_client() as client, client.lock('__ops_acl_lock__', timeout=120, blocking_timeout=15):
+        _assert_prefix_available(client,username,prefix)
+        actual=client.acl_getuser(username)
+        if not actual: raise RuntimeError('Redis tenant does not exist')
+        # Keep password hashes, replace command/key/channel grants atomically.
+        client.execute_command('ACL','SETUSER',username,*_rules(prefix,readonly))
+        client.acl_save()
+    return True
+
 
 def create(owner=None):
-    logging.info("create redis")
-    data = util.get_redis_config_data()
-    
-    tplp = ["security-set-attach.yaml","redis-set.yaml"]
-
-    if data['persistence']:
-       tplp.append("set-attach.yaml")
-
-    if(data['affinity'] or data['tolerations']):
-       tplp.append("affinity-tolerance-sts-core-attach.yaml")
-
-    kust = kus.patchTemplates("redis",tplp , data)    
-    spec = kus.kustom_list("redis", kust, templates=["redis-conf.yaml"], data=data)
-
-    if owner:
-        kopf.append_owner_reference(spec['items'], owner)
-    else:
-        cfg.put("state.redis.spec", spec)
-    res = kube.apply(spec)
-
+    data=util.get_redis_config_data();spec=_build_spec(data)
+    _check_storage_compatibility(spec,data)
+    _ensure_security(data,owner)
+    if owner: kopf.append_owner_reference(spec['items'],owner)
+    else: cfg.put('state.redis.spec',spec)
+    result=kube.apply(spec)
     wait_for_redis_ready()
-    create_openserverless_db_user(data)
+    if not create_openserverless_db_user(data):
+        raise RuntimeError('Could not provision the OpenServerless Redis account')
+    return result
 
-    logging.info(f"create redis: {res}")
-    return res
 
 def wait_for_redis_ready():
-    # dynamically detect redis pod and wait for readiness
-    util.wait_for_pod_ready("{.items[?(@.metadata.labels.name == 'redis')].metadata.name}")
+    kube.kubectl('rollout','status','sts/'+SERVICE_NAME,'--timeout=180s')
 
-def restore_openserverless_db_user():
-    data = util.get_redis_config_data()
-    create_openserverless_db_user(data)
+
+def _connection_metadata(username, password):
+    user=urllib.parse.quote(username,safe='');pwd=urllib.parse.quote(password,safe='')
+    return {'REDIS_URL':f'redis://{user}:{pwd}@{SERVICE_NAME}:6379',
+            'REDIS_ALT_URL':f'redis://{user}:{pwd}@{SERVICE_NAME}:6379',
+            'REDIS_SERVICE':SERVICE_NAME,'REDIS_PORT':6379,
+            'REDIS_PROVIDER':'redis','REDIS_PASSWORD':password}
+
+
+def _add_redis_user_metadata(ucfg, user_metadata):
+    for key,value in _connection_metadata(ucfg.get('namespace'),ucfg.get('redis.password')).items():
+        user_metadata.add_metadata(key,value)
+
 
 def create_openserverless_db_user(data):
-    logging.info(f"authorizing redis for namespace openserverless")
-    try:        
-        data['mode']="create"
-        path_to_script = render_redis_script(data['namespace'],"redis_manage_user_tpl.txt",data)
-        pod_name = util.get_pod_name("{.items[?(@.metadata.labels.name == 'redis')].metadata.name}")
+    provision_user(data['namespace'],data['password'],data['prefix'])
+    values=_connection_metadata(data['namespace'],data['password']);values['REDIS_PREFIX']=_prefix(data['prefix'])
+    for key,value in values.items(): openwhisk.annotate(key.lower()+'='+str(value))
+    return True
 
-        if(pod_name):
-            res = exec_redis_command(pod_name,path_to_script)
 
-            if(res):
-                redis_service =  util.get_service("{.items[?(@.spec.selector.name == 'redis')]}")
-                if(redis_service):
-                    redis_service_name = redis_service['metadata']['name']
-                    redis_service_port = redis_service['spec']['ports'][0]['port']
-                    username = urllib.parse.quote(data['namespace'])
-                    password = urllib.parse.quote(data['password'])
-                    auth = f"{username}:{password}"
-                    redis_url = f"redis://{auth}@{redis_service_name}:{redis_service_port}"
-                    redis_alt_url = f"redis://{password}@{redis_service_name}:{redis_service_port}"
-                    openwhisk.annotate(f"redis_url={redis_url}")
-                    openwhisk.annotate(f"redis_prefix={data['prefix']}")
-                    openwhisk.annotate(f"redis_alt_url={redis_alt_url}")
-                    openwhisk.annotate(f"redis_service={redis_service_name}")
-                    openwhisk.annotate(f"redis_port={redis_service_port}")
-                    openwhisk.annotate(f"redis_password={data['password']}")
-                    openwhisk.annotate(f"redis_provider=valkey")                    
-                    logging.info("*** saved annotation for redis openserverless user")
-            return res
+def restore_openserverless_db_user():
+    return create_openserverless_db_user(util.get_redis_config_data())
 
-        return None
-    except Exception as e:
-        logging.error(f"failed to add redis namespace {data['namespace']}: {e}")
-        return None   
 
-def delete_by_owner():
-    spec = kus.build("redis")
-    res = kube.delete(spec)
-    logging.info(f"delete redis: {res}")
-    return res
+def create_db_user(ucfg: UserConfig, user_metadata: UserMetadata, read_only_mode=False):
+    namespace=ucfg.get('namespace');prefix=_prefix(ucfg.get('redis.prefix') or namespace)
+    provision_user(namespace,ucfg.get('redis.password'),prefix,read_only_mode)
+    user_metadata.add_metadata('REDIS_PREFIX',prefix)
+    _add_redis_user_metadata(ucfg,user_metadata)
+    return True
 
-def delete_by_spec():
-    spec = cfg.get("state.redis.spec")
-    res = False
-    if spec:
-        res = kube.delete(spec)
-        logging.info(f"delete redis: {res}")
-    return res
-
-def delete(owner=None):
-    if owner:        
-        return delete_by_owner()
-    else:
-        return delete_by_spec()    
-
-def render_redis_script(namespace,template,data):
-    """
-    uses the given template to render a redis-cli script to be executed.
-    """
-    if not util.validate_namespace(namespace):
-        raise ValueError(f"Invalid namespace {namespace}")       
-    
-    out = f"/tmp/__{namespace}_{template}"
-    file = ntp.spool_template(template, out, data)
-    return os.path.abspath(file)
-
-def exec_redis_command(pod_name,path_to_script):
-    if not os.path.exists(path_to_script):
-        raise ValueError(f"invalid path script in exec_redis_command")
-    
-    
-    logging.info(f"passing script {path_to_script} to pod {pod_name}")
-    res = kube.kubectl("cp",path_to_script,f"{pod_name}:{path_to_script}")
-    res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"cat {path_to_script} | redis-cli")
-    os.remove(path_to_script)
-    return res
-
-def create_db_user(ucfg: UserConfig, user_metadata: UserMetadata, read_only_mode = False):
-    logging.info(f"authorizing new redis namespace {ucfg.get('namespace')}")    
-    try:
-        wait_for_redis_ready()
-        data = util.get_redis_config_data()
-
-        # if prefix not provided defaults to user namespace
-        prefix = ucfg.get('redis.prefix') or ucfg.get('namespace') 
-        if(not prefix.endswith(":")):
-            prefix = f"{prefix}:"
-        data['prefix']=prefix
-        data['namespace']=ucfg.get('namespace')
-        data['password']=ucfg.get('redis.password')
-        data['mode']="create"
-
-        if read_only_mode:
-            logging.warn(f"activating {prefix} in read-only mode")
-            data['mode']="create_readonly"
-
-        path_to_script = render_redis_script(ucfg.get('namespace'),"redis_manage_user_tpl.txt",data)
-        pod_name = util.get_pod_name("{.items[?(@.metadata.labels.name == 'redis')].metadata.name}")
-
-        if(pod_name):
-            res = exec_redis_command(pod_name,path_to_script)
-
-            if res:
-                user_metadata.add_metadata("REDIS_PREFIX",prefix)
-                _add_redis_user_metadata(ucfg, user_metadata)
-                return res
-            else:
-                logging.error(f"failed to add redis namespace {ucfg.get('namespace')}")
-
-        return None
-    except Exception as e:
-        logging.error(f"failed to add redis namespace {ucfg.get('namespace')}: {e}")
-        return None
 
 def delete_db_user(namespace):
-    logging.info(f"removing redis namespace {namespace}")
+    namespace=_username(namespace)
+    with admin_client() as client, client.lock('__ops_acl_lock__', timeout=120, blocking_timeout=15):
+        client.acl_deluser(namespace)
+        client.acl_save()
+    # Retain keys, matching the previous deletion contract; remove only credentials.
+    return True
 
-    try:        
-        data = util.get_redis_config_data()
-        data["namespace"]=namespace
-        data["mode"]="delete"
 
-        path_to_script = render_redis_script(namespace,"redis_manage_user_tpl.txt",data)
-        pod_name = util.get_pod_name("{.items[?(@.metadata.labels.name == 'redis')].metadata.name}")
+def delete(owner=None):
+    data=util.get_redis_config_data();spec=_build_spec(data) if owner else cfg.get('state.redis.spec')
+    # Volume claim retention keeps identities/data; the orphan guard refuses implicit reuse.
+    return kube.delete(spec) if spec else False
 
-        if(pod_name):
-            res = exec_redis_command(pod_name,path_to_script)
-            return res
-
-        return None
-    except Exception as e:
-        logging.error(f"failed to remove redis namespace {namespace}: {e}")
-        return None
 
 def patch(status, action, owner=None):
-    """
-    Called the the operator patcher to create/delete redis
-    """
     try:
-        logging.info(f"*** handling request to {action} redis")  
-        if  action == 'create':
-            msg = create(owner)
-            operator_util.patch_operator_status(status,'redis','on') 
-        else:
-            msg = delete(owner)
-            operator_util.patch_operator_status(status,'redis','off') 
-
-        logging.info(msg)        
-        logging.info(f"*** hanlded request to {action} redis") 
-    except Exception as e:
-        logging.error('*** failed to update redis: %s' % e)
-        operator_util.patch_operator_status(status,'redis','error')               
-
+        result=create(owner) if action=='create' else delete(owner)
+        operator_util.patch_operator_status(status,'redis','on' if action=='create' else 'off')
+        logging.info('Redis component reconciliation completed')
+        return result
+    except Exception:
+        operator_util.patch_operator_status(status,'redis','error')
+        raise

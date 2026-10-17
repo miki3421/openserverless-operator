@@ -18,44 +18,132 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: redis
+  name: {{name}}
   namespace: openserverless
+  labels:
+    ops.openserverless.org/redis-layout: v810
 spec:
   replicas: 1
+  serviceName: {{name}}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
-      name: redis
-  serviceName: redis
+      name: {{name}}
   template:
     metadata:
       labels:
-        name: redis
+        name: {{name}}
         app: redis
-      annotations:
-        whisks.openserverless.org/annotate-version: "true"
     spec:
-      restartPolicy: Always
-      {% if applypodsecurity %}
+      automountServiceAccountToken: false
       securityContext:
-        fsGroup: 1001
-        runAsUser: 1001 #default BITNAMI user
-      {% endif %}
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+      - name: bootstrap-acl
+        image: "{{image}}"
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-ec"]
+        args:
+        - |
+          if [ -f /data/.ops-redis-v810 ]; then
+            test -s /data/users.acl
+          else
+            test ! -e /data/users.acl
+            umask 077
+            cp /bootstrap/users.acl /data/users.acl
+            touch /data/.ops-redis-v810
+          fi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: redis-data-v810
+          mountPath: /data
+        - name: bootstrap
+          mountPath: /bootstrap
+          readOnly: true
       containers:
       - name: redis
-        image: docker.io/bitnamilegacy/redis:8.2.1
-        command: ["/bin/sh","-c","redis-server /redis-master/redis.conf"]
+        image: "{{image}}"
+        imagePullPolicy: IfNotPresent
+        command: ["redis-server", "/redis-master/redis.conf"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+          seccompProfile:
+            type: RuntimeDefault
         env:
-        - name: MASTER
-          value: "true"
+        - name: REDISCLI_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: {{name}}-admin-v810
+              key: password
         ports:
-        - containerPort: 6379
+        - name: redis
+          containerPort: 6379
+        startupProbe:
+          exec:
+            command: ["redis-cli", "-e", "--user", "ops-admin", "ping"]
+          periodSeconds: 2
+          failureThreshold: 150
+          timeoutSeconds: 3
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "-e", "--user", "ops-admin", "ping"]
+          periodSeconds: 3
+          timeoutSeconds: 3
+        livenessProbe:
+          exec:
+            command: ["redis-cli", "-e", "--user", "ops-admin", "ping"]
+          periodSeconds: 20
+          failureThreshold: 6
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
         volumeMounts:
-        - mountPath: /redis-master
-          name: config
-      volumes:
         - name: config
-          configMap:
-            name: redis-cm
-            items:
-            - key: redis-conf
-              path: redis.conf
+          mountPath: /redis-master
+          readOnly: true
+        - name: redis-data-v810
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: {{name}}-cm
+          items:
+          - key: redis-conf
+            path: redis.conf
+      - name: bootstrap
+        secret:
+          secretName: {{name}}-admin-v810
+          defaultMode: 0440
+          items:
+          - key: users.acl
+            path: users.acl
+      - name: tmp
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data-v810
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: "{{storageClass}}"
+      resources:
+        requests:
+          storage: {{size}}Gi

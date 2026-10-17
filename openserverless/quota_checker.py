@@ -161,10 +161,12 @@ def check_redis_quota(redis_client: RedisClient, redis_wsku):
         spec = wsku['spec']
         metadata = wsku['metadata']
         wsku_name = metadata['name']
-        prefix = f"{spec['redis']['prefix']}"
+        prefix = spec['redis'].get('prefix') or spec['namespace']
         namespace = spec['namespace']
         quota_applied = "false"
-        redis_quota = int(spec['redis']['quota'])*1014*1024
+        redis_quota = int(spec['redis']['quota'])*1024*1024
+        if redis_quota <= 0:
+            raise ValueError('Redis quota must be a positive number of MiB')
 
         if(not prefix.endswith(":")):
             prefix = f"{prefix}:"
@@ -175,6 +177,8 @@ def check_redis_quota(redis_client: RedisClient, redis_wsku):
 
         logging.info(f"REDIS prefix {prefix} enforced quota is set to {redis_quota} bytes")        
         current_redis_db_quota = redis_client.calculate_prefix_allocated_size(prefix)
+        if current_redis_db_quota is None:
+            raise RuntimeError('Could not measure Redis tenant usage')
             
         if current_redis_db_quota >= redis_quota:
                 if quota_applied in ["false"]:
