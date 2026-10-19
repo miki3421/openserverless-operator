@@ -18,9 +18,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Select source-specific image
-        run: echo "IMAGE=ghcr.io/miki3421/openserverless-operator:baseline-090-${GITHUB_SHA}" >> "$GITHUB_ENV"
+        run: echo "IMAGE=ghcr.io/miki3421/openserverless-operator-baseline:baseline-090-${GITHUB_SHA}" >> "$GITHUB_ENV"
       - name: Build complete image
-        run: docker build --platform linux/amd64 --build-arg OPERATOR_IMAGE_DEFAULT=ghcr.io/miki3421/openserverless-operator --build-arg OPERATOR_TAG_DEFAULT=baseline-090-${GITHUB_SHA} --label org.opencontainers.image.source=https://github.com/miki3421/openserverless-operator --label org.opencontainers.image.revision=${GITHUB_SHA} -t "$IMAGE" .
+        run: docker build --platform linux/amd64 --build-arg OPERATOR_IMAGE_DEFAULT=ghcr.io/miki3421/openserverless-operator-baseline --build-arg OPERATOR_TAG_DEFAULT=baseline-090-${GITHUB_SHA} --label org.opencontainers.image.source=https://github.com/miki3421/openserverless-operator --label org.opencontainers.image.revision=${GITHUB_SHA} -t "$IMAGE" .
       - name: Run baseline regression tests
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE/tests:/home/openserverless/tests:ro" --entrypoint /home/openserverless/.venv/bin/python "$IMAGE" -m unittest discover -s tests -p 'test_*.py' -v
@@ -35,3 +35,15 @@ jobs:
         run: |
           docker push "$IMAGE"
           docker image inspect "$IMAGE" --format '{{json .RepoDigests}}' >> "$GITHUB_STEP_SUMMARY"
+      - name: Export the published immutable image for the local lab
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq skopeo
+          skopeo copy --preserve-digests --authfile "$HOME/.docker/config.json" "docker://$IMAGE" oci-archive:baseline-operator.oci:baseline-operator
+      - name: Retain exact local-install image
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: baseline-operator-image
+          path: baseline-operator.oci
+          retention-days: 3
+          compression-level: 0
