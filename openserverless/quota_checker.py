@@ -50,18 +50,18 @@ def get_wsk_users(jsonpath,namespace="openserverless"):
     logging.warning(f"querying wsku with {jsonpath} returned empty response")
     return []
 
-def block_pg_user_quota(pg_client:PostgresClient,wsku_name, pg_db_name, quota_annotation):
+def block_pg_user_quota(pg_client:PostgresClient,wsku_name, pg_username, pg_db_name, quota_annotation):
     """
     Revoke user access from a Postgres database and annotate it with a quota reached annotation
     """
-    if pg_client.revoke_access_from_db(pg_db_name, pg_db_name):
+    if pg_client.revoke_access_from_db(pg_username, pg_db_name):
         annotate(wsku_name,f"{quota_annotation}=true")
 
-def reset_pg_user_quota(pg_client:PostgresClient,wsku_name, pg_db_name, quota_annotation):
+def reset_pg_user_quota(pg_client:PostgresClient,wsku_name, pg_username, pg_db_name, quota_annotation):
     """
     RE-Grant user access from a Postgres database and annotate it with a quota reached annotation
     """
-    if pg_client.grant_access_on_db(pg_db_name, pg_db_name):
+    if pg_client.grant_access_on_db(pg_username, pg_db_name):
         annotate(wsku_name,f"{quota_annotation}=false")        
 
 def check_pg_quota(pg_client:PostgresClient, pg_dbsize_list, pg_wsku, check_ferretdb=False):
@@ -81,31 +81,34 @@ def check_pg_quota(pg_client:PostgresClient, pg_dbsize_list, pg_wsku, check_ferr
         quota_annotation = check_ferretdb and FERRRET_DB_QUOTA_ANNOTATION or POSTGRES_DB_QUOTA_ANNOTATION
         quota_applied = "false"
 
+        pg_username = spec['namespace'] + ('_ferretdb' if check_ferretdb else '')
         pg_db= check_ferretdb and f"{spec['mongodb']['database']}_ferretdb" or spec['postgres']['database']
-        pg_db_quota = check_ferretdb and int(spec['mongodb']['quota'])*1014*1024 or int(spec['postgres']['quota'])*1024*1024
+        quota = spec['mongodb' if check_ferretdb else 'postgres']['quota']
 
         # Check if the quota annotations has been already applied
         if "annotations" in metadata and quota_annotation in metadata["annotations"]:
             quota_applied = metadata["annotations"][quota_annotation]
+
+        if quota == "auto":
+            if quota_applied == "true":
+                reset_pg_user_quota(pg_client, wsku_name, pg_username, pg_db, quota_annotation)
+            continue
+        pg_db_quota = int(quota) * (1014 if check_ferretdb else 1024) * 1024
 
         logging.info(f"PG database {pg_db} enforced quota is set to {pg_db_quota} bytes")
         if pg_db in pg_dbsize_list:
             current_pg_db_quota = pg_dbsize_list[pg_db]
             
             if current_pg_db_quota >= pg_db_quota:
-                if quota_applied in ["false"]:
-                    block_pg_user_quota(pg_client, 
-                                wsku_name, 
-                                pg_db,
-                                quota_annotation)
-                    continue    
-                else:
-                    logging.info(f"***** Postgres DB {pg_db} size {current_pg_db_quota} is exceeding quota limit {pg_db_quota}, but revoke has been already executed ****")
-                    continue
+                # Reassert the barrier even for legacy annotations, which may
+                # only record the old ineffective ACL-based enforcement.
+                block_pg_user_quota(pg_client, wsku_name, pg_username, pg_db, quota_annotation)
+                continue
             
             if current_pg_db_quota < pg_db_quota and quota_applied in ["true"]:
                 reset_pg_user_quota(pg_client, 
                               wsku_name, 
+                              pg_username,
                               pg_db,
                               quota_annotation)
                 continue 
@@ -188,7 +191,8 @@ def start():
     verifies that the corresponding database space allocations does not exceed the
     quota size specific in megabytes.
 
-    If the quota is exceeded, user will be set in readonly mode and no more write TX will be accepted. 
+    If the quota is exceeded, login is suspended and active sessions are terminated.
+    Access (including reads) resumes once the administrator raises the quota or frees space.
     """
     logging.basicConfig(level=logging.INFO)
     logging.info("****** OPENSERVERLESS Quota enforcer started *****")
@@ -202,10 +206,10 @@ def start():
 
     pg_dbsize_list = pg_client.query_all_pg_database_size()
 
-    pg_wsku = get_wsk_users("{.items[?(@.spec.postgres.quota != 'auto')]}")
+    pg_wsku = get_wsk_users("{.items[?(@.spec.postgres.quota)]}")
     check_pg_quota(pg_client,pg_dbsize_list, pg_wsku)
 
-    ferretdb_wsku = get_wsk_users("{.items[?(@.spec.mongodb.quota != 'auto')]}")
+    ferretdb_wsku = get_wsk_users("{.items[?(@.spec.mongodb.quota)]}")
     check_pg_quota(pg_client,pg_dbsize_list, ferretdb_wsku, True)
 
     redis_wsku = get_wsk_users("{.items[?(@.spec.redis.quota != 'auto')]}")

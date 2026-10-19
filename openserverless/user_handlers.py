@@ -101,10 +101,15 @@ def whisk_user_create(spec, name, patch, **kwargs):
     res = userdb.save_user_metadata(user_metadata)
     state['user_metadata']= res
 
-    conditions.append({        
+    failed_components = sorted(component for component, result in state.items() if not result)
+    if failed_components:
+        logging.error("User provisioning incomplete; failed components: %s", ", ".join(failed_components))
+    conditions.append({
         "lastTransitionTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "status": "True",
-        "type": "Ready"})
+        "status": "False" if failed_components else "True",
+        "type": "Ready",
+        "reason": "ProvisioningFailed" if failed_components else "ProvisioningSucceeded",
+        "message": "Failed components: " + ", ".join(failed_components) if failed_components else "Requested resources provisioned"})
 
     patch.status['conditions']=conditions
     return state
@@ -187,4 +192,4 @@ def whisk_user_resume(spec, name, namespace,annotations, **kwargs):
         state['milvus']= True 
 
     if(cfg.get('components.postgres') and ucfg.get('postgres.enabled')):
-        state['postgres']= True                          
+        state['postgres']= True

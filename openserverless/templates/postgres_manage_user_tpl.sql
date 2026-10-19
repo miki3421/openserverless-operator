@@ -18,32 +18,24 @@
  */
 
 {% if mode == 'create' %}
-SELECT 'CREATE DATABASE {{database}}'
+SELECT format('CREATE DATABASE %I', '{{database}}')
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{database}}')\gexec
 
-DO $$
-BEGIN
-    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{username}}') THEN
-        ALTER USER {{username}} WITH PASSWORD '{{password}}';
-    ELSE
-        CREATE USER {{username}} WITH PASSWORD '{{password}}';
-    END IF;
-END
-$$;
+SELECT format('CREATE ROLE %I LOGIN', '{{username}}')
+WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{username}}')\gexec
 
-GRANT ALL PRIVILEGES ON DATABASE {{database}} to {{username}};
-REVOKE CONNECT ON DATABASE {{database}} from public;
+SELECT format('ALTER ROLE %I PASSWORD %L', '{{username}}',
+              convert_from(decode('{{password_base64}}', 'base64'), 'UTF8'))\gexec
+
+GRANT ALL PRIVILEGES ON DATABASE {{database_identifier}} TO {{username_identifier}};
+REVOKE CONNECT ON DATABASE {{database_identifier}} FROM public;
 {% endif %}
 
 {% if mode == 'delete' %}
-DROP DATABASE IF EXISTS {{database}};
+DROP DATABASE IF EXISTS {{database_identifier}};
 
-DO $$
-BEGIN
-    IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{username}}') THEN
-        DROP OWNED BY {{username}};
-        DROP USER {{username}};
-    END IF;
-END
-$$;
+SELECT format('DROP OWNED BY %I', '{{username}}')
+WHERE EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{username}}')\gexec
+SELECT format('DROP ROLE %I', '{{username}}')
+WHERE EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{username}}')\gexec
 {% endif %}

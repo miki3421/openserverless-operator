@@ -59,24 +59,26 @@ def kubectl(*args, namespace="openserverless", input=None, jsonpath=None, debugr
 
     global returncode, output, error
     returncode = res.returncode
-    output = res.stdout.decode()
-    error = res.stderr.decode()
+    local_output = res.stdout.decode()
+    local_error = res.stderr.decode()
+    output = local_output
+    error = local_error
 
     if res.returncode == 0:
         if jsonpath:
                 try:
-                    parsed = json.loads(output)
+                    parsed = json.loads(local_output)
                     if debugresult:
                         logging.debug("result: %s", json.dumps(parsed, indent=2))
                     return parsed
                 except Exception as e:
-                    logging.info(output)
+                    logging.info(local_output)
                     logging.info(e)
                     return e
         else:
-            return output
-    logging.info(f"Error: kubectl f{cmd} input='{input}' output='{output}' error='{error}'")
-    raise Exception(error)
+            return local_output
+    logging.info(f"Error: kubectl f{cmd} input='{input}' output='{local_output}' error='{local_error}'")
+    raise Exception(local_error)
 
 # create a configmap from keyword arguments
 def configMap(name, **kwargs):
