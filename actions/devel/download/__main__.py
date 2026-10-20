@@ -79,6 +79,7 @@ def main(args):
     if('x-impersonate-auth' not in headers):
         return build_error("invalid request, missing mandatory header: x-impersonate-auth")
 
+    response = None
     try:        
         download_data = process_path_param(args['__ow_path'])
 

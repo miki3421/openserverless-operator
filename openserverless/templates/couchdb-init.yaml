@@ -45,5 +45,7 @@ spec:
         command: ["./dbinit.sh"]
         env:
         - name: "OPENSERVERLESS_CONFIG"
-          value: >
-            {{config}}
+          valueFrom:
+            secretKeyRef:
+              name: couchdb-init-config
+              key: config

@@ -191,6 +191,13 @@ def main(args):
             if auth_header != envs['AUTH']:
                 return build_error("invalid authorization header", 401)
 
+            try:
+                uuid, key = auth_header.split(':', 1)
+                if not db.find_active_subject(uuid=uuid, key=key, subject=login):
+                    return build_error("invalid authorization header", 401)
+            except Exception:
+                return build_error("invalid authorization header", 401)
+
             if 'env' in args:
                 user_data, added, removed, changed = handle_additional_env(user_data, args['env'])
                 if not save_user_data(db, user_data):

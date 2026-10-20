@@ -376,7 +376,8 @@ def start():
     interval = from_cron_to_seconds(currentDate, config['scheduler.schedule'])
     logging.info(f"interval in seconds between 2 execution is {interval} seconds")
 
-    db = cu.CouchDB()
+    db = cu.CouchDB(username=config['couchdb.controller.user'],
+                    password=config['couchdb.controller.password'])
     res = check(db.wait_db_ready(30), "wait_db_ready", True)
 
     if(res):

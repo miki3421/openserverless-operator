@@ -22,14 +22,13 @@ metadata:
   name: couchdb-np
   namespace: openserverless
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: openserverless-couchdb        
     replicationRole: primary
   ports:   
     - port: 5984
       targetPort: 5984
-      nodePort: 30984
 ---
 apiVersion: v1
 kind: Service

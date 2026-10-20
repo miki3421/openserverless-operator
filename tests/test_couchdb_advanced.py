@@ -84,14 +84,16 @@ class CouchDBAdvancedTests(unittest.TestCase):
                 self.assertFalse(couchdb.init())
             self.assertNotIn(secret,"\n".join(captured.output))
     def test_single_node_setup_accepts_declaratively_enabled_server(self):
-        db=CouchDB()
+        with patch.dict(couchdb.os.environ, {"COUCHDB_ADMIN_PASSWORD": "synthetic-test-password"}):
+            db=CouchDB()
         db.db_session=Mock()
         db.db_session.get.return_value.status_code=200
         db.db_session.get.return_value.json.return_value={"state":"single_node_enabled"}
         self.assertTrue(db.configure_single_node())
         db.db_session.post.assert_not_called()
     def test_single_node_setup_does_not_hide_authentication_errors(self):
-        db=CouchDB()
+        with patch.dict(couchdb.os.environ, {"COUCHDB_ADMIN_PASSWORD": "synthetic-test-password"}):
+            db=CouchDB()
         db.db_session=Mock()
         db.db_session.get.return_value.status_code=401
         db.db_session.post.return_value.status_code=401

@@ -34,9 +34,12 @@ def get_couchdb_inputs():
     couchdb_host = cfg.get("couchdb.host") or "couchdb"
     couchdb_port = cfg.get("couchdb.port") or "5984"
 
+    password = cfg.get("couchdb.admin.password", "COUCHDB_ADMIN_PASSWORD")
+    if not isinstance(password, str) or not password.strip():
+        raise ValueError("CouchDB administrator password must be configured")
     cdb_inputs=[]
     cdb_inputs.append({"key":"couchdb_user", "value":cfg.get("couchdb.admin.user", "COUCHDB_ADMIN_USER", "whisk_admin")})
-    cdb_inputs.append({"key":"couchdb_password", "value":cfg.get("couchdb.admin.password", "COUCHDB_ADMIN_PASSWORD", "some_passw0rd")})
+    cdb_inputs.append({"key":"couchdb_password", "value":password})
     cdb_inputs.append({"key":"couchdb_host", "value":couchdb_host})
     cdb_inputs.append({"key":"couchdb_port", "value":couchdb_port})
 

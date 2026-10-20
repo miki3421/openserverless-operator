@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-import kopf, os, logging, json
+import kopf, os, logging, json, subprocess
 import openserverless.kustomize as kus
 import openserverless.kube as kube
 import openserverless.couchdb_util as cu
@@ -32,6 +32,22 @@ loader = FileSystemLoader(["./openserverless/templates", "./openserverless/files
 env = Environment(loader=loader)
 
 def update_templated_doc(db, database, template, data):
+    # Serialize structured documents; tenant strings must never become JSON syntax.
+    if template == 'user_metadata.json':
+        doc = {
+            '_id': data['login'], 'login': data['login'],
+            'password': data['password'], 'email': data['email'],
+            'env': [{'key': item['key'], 'value': str(item['value'])}
+                    for item in data.get('metadata', [])],
+            'quota': [{'key': item['key'], 'value': str(item['value'])}
+                      for item in data.get('quota', [])],
+        }
+        return db.update_doc(database, doc)
+    if template == 'subject.json':
+        return db.update_doc(database, {
+            '_id': data['name'], 'subject': data['name'],
+            'namespaces': [{'name': data['name'], 'uuid': data['uuid'], 'key': data['key']}],
+        })
     tpl = env.get_template(template)
     doc = json.loads(tpl.render(data))
     return db.update_doc(database, doc)
@@ -43,7 +59,8 @@ def create(owner=None):
         raise RuntimeError("OPS Advanced CouchDB 3.5 requires a separately validated OpenShift image; no CouchDB resources were changed.")
     couchdb_profile.preflight(kube.kubectl)
     u = cfg.get('couchdb.admin.user', "COUCHDB_ADMIN_USER", "whisk_admin")
-    p = cfg.get('couchdb.admin.password', "COUCHDB_ADMIN_PASSWORD", "some_passw0rd")
+    p = cfg.get('couchdb.admin.password', "COUCHDB_ADMIN_PASSWORD")
+    init_config = initialization_config()
     user = f"db_username={u}"
     pasw = f"db_password={p}"
 
@@ -52,12 +69,10 @@ def create(owner=None):
     image = f"{img}:{tag}"
     container_image = couchdb_profile.PROFILE["image"]
 
-    config = json.dumps(cfg.getall())
     data = {
         "runtime":runtime,
         "container_image":container_image,
         "image": image,
-        "config": config,
         "name": "couchdb", 
         "container": "couchdb", 
         "size": cfg.get("couchdb.volume-size", "COUCHDB_VOLUME_SIZE", 10), 
@@ -89,17 +104,51 @@ def create(owner=None):
         "data": {"00-openserverless.ini": couchdb_profile.SETTINGS},
     })
     
+    spec['items'].append({
+        'apiVersion': 'v1', 'kind': 'Secret',
+        'metadata': {'name': 'couchdb-init-config', 'namespace': 'openserverless'},
+        'type': 'Opaque', 'stringData': {'config': json.dumps(init_config)},
+    })
     if owner:
         kopf.append_owner_reference(spec['items'], owner)
     else:
         cfg.put("state.couchdb.spec", spec)
-    res = kube.apply(spec)
+    res = apply_couchdb_spec(spec)
 
     if res:
         # dynamically detect couchdb pod and wait for readiness
         util.wait_for_pod_ready("{.items[?(@.metadata.labels.name == 'couchdb')].metadata.name}")
 
     return res
+
+def apply_couchdb_spec(spec):
+    # The generic kube wrapper logs stdin on failure. Keep bootstrap Secrets
+    # out of that path, including when the API rejects the request.
+    private = [item for item in spec['items'] if item['kind'] == 'Secret']
+    public = [item for item in spec['items'] if item['kind'] != 'Secret']
+    if private:
+        result = subprocess.run(['kubectl', '-n', 'openserverless', 'apply', '-f', '-'],
+                                input=json.dumps({'apiVersion': 'v1', 'kind': 'List', 'items': private}),
+                                text=True, capture_output=True, timeout=60)
+        if result.returncode:
+            raise RuntimeError('Could not apply private CouchDB bootstrap resources')
+    return kube.apply({'apiVersion': 'v1', 'kind': 'List', 'items': public})
+
+def initialization_config():
+    """Only the settings used by dbinit belong in its Secret."""
+    result = {}
+    for role in ('admin', 'controller', 'invoker'):
+        for field in ('user', 'password'):
+            name = f'couchdb.{role}.{field}'
+            value = cfg.get(name, f'COUCHDB_{role.upper()}_{field.upper()}')
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f'CouchDB {role} {field} must be configured')
+            result[name] = value
+    for name in ('couchdb.host', 'couchdb.port'):
+        if cfg.get(name):
+            result[name] = cfg.get(name)
+    result.update(cfg.getall('openwhisk.namespaces.'))
+    return result
 
 def delete():
     spec = cfg.get("state.couchdb.spec")
@@ -122,9 +171,11 @@ def init_system(db):
     res = check(db.configure_single_node(), "configure_single_node", res)
     res = check(db.configure_no_reduce_limit(), "configure_no_reduce_limit", res)
     cuser = cfg.get('couchdb.controller.user', "COUCHDB_CONTROLLER_USER", "controller_admin")
-    cpasw = cfg.get('couchdb.controller.password', "COUCHDB_CONTROLLER_PASSWORD", "s0meP@ass1")
+    cpasw = cfg.get('couchdb.controller.password', "COUCHDB_CONTROLLER_PASSWORD")
     iuser = cfg.get('couchdb.invoker.user', "COUCHDB_INVOKER_USER", "invoker_admin")
-    ipasw = cfg.get('couchdb.invoker.password', "COUCHDB_INVOKER_PASSWORD", "s0meP@ass2")
+    ipasw = cfg.get('couchdb.invoker.password', "COUCHDB_INVOKER_PASSWORD")
+    if not all(isinstance(value, str) and value.strip() for value in (cpasw, ipasw)):
+        raise ValueError('CouchDB controller and invoker passwords must be configured')
     res = check(db.add_user(cuser, cpasw), "add_user: controller", res)
     return check(db.add_user(iuser, ipasw), "add_user: invoker", res)
 

@@ -26,29 +26,32 @@ import openserverless.kube as kube
 import openserverless.testutil as tu
 
 assert(cfg.configure(tu.load_sample_config()))
-cfg.put("couchdb.host", "localhost")
 assert(cfg.detect_labels()["openserverless.kube"] == "kind")
 assert(cfg.detect_storage()["openserverless.storageclass"] == "standard")
-assert(cfg.get("couchdb.host") == "localhost")
 
 !kubectl apply -f tests/kind/whisk.yaml
 wsk = kube.get("wsk/controller")
 cdb.create(wsk)
 
 import openserverless.couchdb_util
-db = openserverless.couchdb_util.CouchDB()
+from openserverless.datastore_connection import service_endpoint
 
-assert(db.wait_db_ready(60))
-assert(db.configure_single_node())
-assert(db.configure_no_reduce_limit())
+with service_endpoint("couchdb", 5984) as (host, port):
+    cfg.put("couchdb.host", host)
+    cfg.put("couchdb.port", str(port))
+    db = openserverless.couchdb_util.CouchDB()
 
-assert(cdb.init_system(db))
-assert(cdb.init_subjects(db))
-assert(cdb.init_activations(db))
-assert(cdb.init_actions(db))
-assert(cdb.add_initial_subjects(db))
+    assert(db.wait_db_ready(60))
+    assert(db.configure_single_node())
+    assert(db.configure_no_reduce_limit())
 
-assert(cdb.init_compactions_config(db))
+    assert(cdb.init_system(db))
+    assert(cdb.init_subjects(db))
+    assert(cdb.init_activations(db))
+    assert(cdb.init_actions(db))
+    assert(cdb.add_initial_subjects(db))
+
+    assert(cdb.init_compactions_config(db))
 
 !kubectl -n openserverless delete all --all
 !kubectl -n openserverless delete pvc --all
