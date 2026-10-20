@@ -27,47 +27,50 @@ import openserverless.testutil as tu
 # init
 assert(cfg.configure(tu.load_sample_config()))
 cfg.detect()
-cfg.put("couchdb.host", "localhost")
-assert(cfg.get("couchdb.host") == "localhost")
 cdb.create(None)
 
 !kubectl -n openserverless wait --for=condition=ready pod couchdb-0
 
-db = cu.CouchDB()
+from openserverless.datastore_connection import service_endpoint
 
-assert(db.wait_db_ready(60))
+with service_endpoint("couchdb", 5984) as (host, port):
+    cfg.put("couchdb.host", host)
+    cfg.put("couchdb.port", str(port))
+    db = cu.CouchDB()
 
-# database init
-assert( not db.check_db("subjects"))
-assert(db.create_db("subjects"))
-assert(db.check_db("subjects"))
-assert(not db.create_db("subjects"))
-assert(db.delete_db("subjects"))
-assert(not db.delete_db("subjects"))
-assert(not db.check_db("subjects"))
-assert(db.recreate_db("subjects") == 'recreate_db: created')
-assert(db.check_db("subjects"))
-assert(db.recreate_db("subjects") == 'recreate_db:')
-assert(db.recreate_db("subjects", recreate=True) == 'recreate_db: deleted created')
-assert(db.delete_db("subjects"))
+    assert(db.wait_db_ready(60))
 
-assert(db.create_db("test"))
-assert(db.get_doc("test", "test") == None) 
-doc = {"_id":"test", "value":"hello" }
-assert(db.update_doc("test",  doc))
+    # database init
+    assert( not db.check_db("subjects"))
+    assert(db.create_db("subjects"))
+    assert(db.check_db("subjects"))
+    assert(not db.create_db("subjects"))
+    assert(db.delete_db("subjects"))
+    assert(not db.delete_db("subjects"))
+    assert(not db.check_db("subjects"))
+    assert(db.recreate_db("subjects") == 'recreate_db: created')
+    assert(db.check_db("subjects"))
+    assert(db.recreate_db("subjects") == 'recreate_db:')
+    assert(db.recreate_db("subjects", recreate=True) == 'recreate_db: deleted created')
+    assert(db.delete_db("subjects"))
 
-assert(db.get_doc("test", "test")['value']  == 'hello')
-doc['value'] = 'world'
-assert(db.update_doc("test",  doc))
-assert(db.get_doc("test", "test")['value']  == 'world')
-assert(db.delete_doc("test", "test"))
-assert(not db.delete_doc(db, "test"))
-assert(cdb.update_templated_doc(db, "test", "test.json", {"item": "first"}))
-assert(db.get_doc("test", "test")['value'] == 'first')
-assert(cdb.update_templated_doc(db, "test", "test.json", {"item": "second"}))
-assert(db.get_doc("test", "test")['value'] == 'second')
-assert(db.delete_doc("test", "test"))
-assert(db.delete_db("test"))
+    assert(db.create_db("test"))
+    assert(db.get_doc("test", "test") == None)
+    doc = {"_id":"test", "value":"hello" }
+    assert(db.update_doc("test",  doc))
+
+    assert(db.get_doc("test", "test")['value']  == 'hello')
+    doc['value'] = 'world'
+    assert(db.update_doc("test",  doc))
+    assert(db.get_doc("test", "test")['value']  == 'world')
+    assert(db.delete_doc("test", "test"))
+    assert(not db.delete_doc(db, "test"))
+    assert(cdb.update_templated_doc(db, "test", "test.json", {"item": "first"}))
+    assert(db.get_doc("test", "test")['value'] == 'first')
+    assert(cdb.update_templated_doc(db, "test", "test.json", {"item": "second"}))
+    assert(db.get_doc("test", "test")['value'] == 'second')
+    assert(db.delete_doc("test", "test"))
+    assert(db.delete_db("test"))
 
 # cleanup
 cdb.delete()

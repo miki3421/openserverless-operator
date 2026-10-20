@@ -104,6 +104,8 @@ def main(args):
 
         if user_data:
             if bu.verify_password(password, user_data['password']):
+                if not db.find_active_subject(subject=login):
+                    return {"statusCode": 401, "body": "Invalid credentials"}
                 return build_response(map_data(user_data))
             else:
                 return build_error(f"password mismatch for user {login}")

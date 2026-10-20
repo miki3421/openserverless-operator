@@ -45,9 +45,6 @@ nodes:
   - containerPort: 30896
     hostPort: 7896
     protocol: TCP  
-  - containerPort: 30984
-    hostPort: 5984
-    protocol: TCP  
   - containerPort: 30992 
     hostPort: 9092
     protocol: TCP

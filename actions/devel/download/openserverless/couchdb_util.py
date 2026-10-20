@@ -20,18 +20,52 @@ import requests as req
 import openserverless.config as cfg
 
 class CouchDB:
-  def __init__(self):
+  def __init__(self, username=None, password=None):
     self.db_protocol   = "http"
     self.db_prefix     = "openserverless_"
     self.db_port       = cfg.get("couchdb.port", "COUCHDB_SERVICE_PORT", "5984")
     self.db_host       = cfg.get("couchdb.host", "COUCHDB_SERVICE_HOST", "couchdb")
-    self.db_username   = cfg.get("couchdb.admin.user", "COUCHDB_ADMIN_USER", "whisk_admin")
-    self.db_password   = cfg.get("couchdb.admin.password", "COUCHDB_ADMIN_PASSWORD", "some_passw0rd")
+    self.db_username = username if username is not None else cfg.get("couchdb.admin.user", "COUCHDB_ADMIN_USER", "whisk_admin")
+    self.db_password = password if password is not None else cfg.get("couchdb.admin.password", "COUCHDB_ADMIN_PASSWORD")
+    if not isinstance(self.db_password, str) or not self.db_password.strip():
+        raise ValueError("CouchDB password must be configured")
     self.db_auth = req.auth.HTTPBasicAuth(self.db_username,self.db_password)
     self.db_url = f"{self.db_protocol}://{self.db_host}:{self.db_port}"
     self.db_base = f"{self.db_url}/{self.db_prefix}"
     self.db_session = req.Session()
     self.db_session.auth = self.db_auth
+
+  def find_active_subject(self, *, uuid=None, key=None, subject=None):
+      """Look up a live identity, enforcing revocation on every authentication path."""
+      selector = {}
+      if subject is not None:
+          if not isinstance(subject, str) or not subject:
+              return None
+          selector['subject'] = {'$eq': subject}
+      if uuid is not None or key is not None:
+          if not all(isinstance(value, str) and value for value in (uuid, key)):
+              return None
+          selector['namespaces'] = {'$elemMatch': {'uuid': uuid, 'key': key}}
+      if not selector:
+          return None
+      response = self.find_doc('subjects', json.dumps({'selector': selector}))
+      if not isinstance(response, dict) or not isinstance(response.get('docs'), list):
+          return None
+      for doc in response['docs']:
+          if not isinstance(doc, dict) or doc.get('blocked') or not doc.get('subject'):
+              continue
+          if subject is not None and doc.get('subject') != subject:
+              continue
+          namespaces = doc.get('namespaces')
+          if not isinstance(namespaces, list) or not any(
+                  isinstance(ns, dict) and ns.get('uuid') and ns.get('key') for ns in namespaces):
+              continue
+          if uuid is not None and not any(
+                  isinstance(ns, dict) and ns.get('uuid') == uuid and ns.get('key') == key
+                  for ns in namespaces):
+              continue
+          return doc
+      return None
 
   def wait_db_ready(self, max_seconds):
       logging.info("entering CouchDB.wait_db_ready()")
