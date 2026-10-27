@@ -108,7 +108,10 @@ def config_from_spec(spec, handler_type = "on_create"):
     """
     cfg.clean()
     cfg.configure(spec)
+    from openserverless import image_catalog
+    image_catalog.catalog()  # Reject malformed catalogs before cluster mutations.
     cfg.detect()
+    image_catalog.validate_for_spec()
 
     if "on_create" in handler_type:       
         cfg.put("config.apihost", "https://pending")
@@ -132,4 +135,4 @@ def patch_operator_status(status,component, status_code):
         logging.debug(f"patching component {component} with code = {status_code} from event handler {status}")
         status['whisk_create'][component]=status_code
     except Exception as e:
-        logging.error('*** failed to patch_operator_status: %s' % e)  
+        logging.error('*** failed to patch_operator_status: %s' % e)

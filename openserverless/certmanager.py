@@ -51,7 +51,13 @@ def create(owner=None):
         # we apply the cert-manager.yaml as is
         spec = "deploy/cert-manager/cert-manager.yaml"
         cfg.put("state.cm.spec", spec)       
-        res = kube.kubectl("apply", "-f", spec, namespace=None)
+        from openserverless import image_catalog
+        if image_catalog.catalog() is None:
+            res = kube.kubectl("apply", "-f", spec, namespace=None)
+        else:
+            with open(spec) as manifest:
+                rendered = image_catalog.render_yaml('cert-manager', manifest.read())
+            res = kube.kubectl("apply", "-f", "-", input=rendered, namespace=None)
 
         # ensure the cert-manager pods are running    
         wait_for_cm_ready(runtime, r"{.items[?(@.metadata.labels.app\.kubernetes\.io\/component == 'controller')].metadata.name}")

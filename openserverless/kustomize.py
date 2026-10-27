@@ -21,13 +21,15 @@ import os, io, yaml, subprocess
 import openserverless.kube as kube
 import openserverless.kustomize as nku
 import openserverless.template as ntp
+import openserverless.image_catalog as image_catalog
 
-def _build(dir):
+def _build(dir, resolve_images=True):
     res = subprocess.run(["kustomize", "build", dir], capture_output=True)
     if res.returncode != 0:
         error = res.stderr.decode("utf-8")
         raise Exception(error)
-    return res.stdout.decode("utf-8")
+    text = res.stdout.decode("utf-8")
+    return image_catalog.render_yaml(os.path.basename(dir), text) if resolve_images else text
 
 # execute the kustomization of a folder under "deploy"
 # specified with `where`
@@ -82,7 +84,7 @@ def kustomize(where, *what, templates=[], data={}):
 # the openserverless operator needs to delete a component
 def build(where):
     dir = f"deploy/{where}"
-    return _build(dir)
+    return _build(dir, resolve_images=False)
 
 # execute the kustomization of a folder under "deploy"
 # specified with `where`

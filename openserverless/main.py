@@ -400,6 +400,8 @@ def whisk_update(spec, status, namespace, diff, name, **kwargs):
     operator_util.config_from_spec(spec,handler_type="on_update")
     owner = kube.get(f"wsk/{name}")
 
+    from openserverless import image_catalog
+    image_catalog.reconcile(owner)
     messaging_security.reconcile(owner)
     monitoring.reconcile(owner)
     seaweedfs.reconcile(owner)
@@ -408,6 +410,9 @@ def whisk_update(spec, status, namespace, diff, name, **kwargs):
 @kopf.on.resume('openserverless.org', 'v1', 'whisks')
 def whisk_resume(spec, status, name, **kwargs):   
     operator_util.config_from_spec(spec, handler_type="on_resume")
+    from openserverless import image_catalog
+    if image_catalog.catalog() is not None:
+        image_catalog.reconcile(kube.get(f"wsk/{name}"))
     if cfg.get('components.zookeeper') or cfg.get('components.kafka'):
         messaging_security.reconcile(kube.get(f"wsk/{name}"))
     if cfg.get('components.monitoring'):

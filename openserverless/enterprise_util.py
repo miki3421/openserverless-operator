@@ -37,6 +37,11 @@ def extract_host(srv_address_url):
     return m.group(0)
 
 def get_invoker_image_data(data):
+    from openserverless import image_catalog
+    images = image_catalog.catalog()
+    if images is not None:
+        data['invoker_image'], data['invoker_tag'] = images['invoker'].rsplit(':', 1)
+        return
     invoker_image = cfg.get("invoker.image")
 
     if ":" in invoker_image:
@@ -156,7 +161,7 @@ def getEnterpriseInvokerConfigData():
     util.get_controller_image_data(data)
     get_invoker_image_data(data)
     invoker_affinity_tolerations_data(data)
-    return data    
+    return data
 
 def get_prometheus_config_data():
     data = {
@@ -226,4 +231,4 @@ def get_kafka_config_data():
         "storage_class": cfg.get("openserverless.storageclass") or "standard"
     }
     util.common_affinity_tolerations_data(data)
-    return data    
+    return data

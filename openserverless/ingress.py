@@ -83,7 +83,13 @@ def create(owner=None):
     cfg.put("state.ingress.spec", spec)
     
     # apply and waits for ingress to be ready  
-    res = kube.kubectl("apply", "-f", spec, namespace=None)
+    from openserverless import image_catalog
+    if image_catalog.catalog() is None:
+        res = kube.kubectl("apply", "-f", spec, namespace=None)
+    else:
+        with open(spec) as manifest:
+            rendered = image_catalog.render_yaml('ingress-nginx', manifest.read())
+        res = kube.kubectl("apply", "-f", "-", input=rendered, namespace=None)
     wait_for_ingress_ready(runtime, namespace)
     return res
 

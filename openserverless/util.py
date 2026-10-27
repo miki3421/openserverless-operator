@@ -325,6 +325,13 @@ def parse_image(img):
     return data
 
 def get_controller_image_data(data):
+    from openserverless import image_catalog
+    images = image_catalog.catalog()
+    if images is not None:
+        # Existing templates concatenate these two fields. Split at the final
+        # colon so registry ports and tag+digest references remain lossless.
+        data['controller_image'], data['controller_tag'] = images['controller'].rsplit(':', 1)
+        return
     controller_image = cfg.get("controller.image")
 
     if ":" in controller_image:
