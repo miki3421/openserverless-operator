@@ -66,7 +66,7 @@ class CouchDB:
   def create_db(self, database):
     url = f"{self.db_base}{database}"
     r = self.db_session.put(url) 
-    return r.status_code == 201
+    return r.status_code == 201 or (r.status_code == 412 and self.check_db(database))
 
   # database="subjects"
   def recreate_db(self, database, recreate=False):
@@ -137,7 +137,14 @@ class CouchDB:
     userpass = {"name": username, "password": password, "roles": [], "type": "user"}
     url = f"{self.db_url}/_users/org.couchdb.user:{username}"
     res = self.db_session.put(url, json=userpass)
-    return res.status_code in [200, 201, 421]
+    if res.status_code in [200, 201, 421]:
+      return True
+    if res.status_code != 409:
+      return False
+    # A restored user is acceptable only if the configured credential still
+    # authenticates as that exact user. Do not reset its password or roles.
+    check = req.get(f"{self.db_url}/_session", auth=(username, password), timeout=10)
+    return check.status_code == 200 and check.json().get('userCtx', {}).get('name') == username
 
   #def add_role(self, database: str, members: list[str] = [], admins: list[str] =[]):  
   def add_role(self, database: str, members = [], admins =[]):  
