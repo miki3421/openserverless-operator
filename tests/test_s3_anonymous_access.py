@@ -41,6 +41,7 @@ class AnonymousS3AccessTest(unittest.TestCase):
                 client.verify_anonymous_access({"custom-web"})
         for document in ({}, {"identities": None}, {"identities": []},
                          {"identities": [None]}, {"identities": [{"name": "anonymous", "actions": None}]},
+                         {"identities": [{"name": "anonymous", "actions": {"Read:custom-web": True}}]},
                          {"identities": [{"name": "anonymous", "actions": ["Read:custom-web"]}] * 2}):
             get.return_value.json.return_value = document
             with self.subTest(document=document), self.assertRaises(RuntimeError):

@@ -160,7 +160,10 @@ class SeaweedfsClient:
                 raise ValueError()
             anonymous = [item for item in identities if item["name"] == "anonymous"]
             expected = {f"Read:{bucket}" for bucket in buckets}
-            if len(anonymous) != 1 or set(anonymous[0]["actions"]) != expected:
+            if len(anonymous) != 1:
+                raise ValueError()
+            actions = anonymous[0]["actions"]
+            if not isinstance(actions, list) or any(not isinstance(action, str) for action in actions) or set(actions) != expected:
                 raise ValueError()
         except (requests.RequestException, ValueError, KeyError, TypeError):
             raise RuntimeError("Could not verify anonymous S3 web-only grants") from None
