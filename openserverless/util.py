@@ -958,7 +958,7 @@ def get_seaweedfs_config_data():
         "seaweedfs_host": cfg.get('seaweedfs.host') or 'seaweedfs',
         "size": cfg.get('seaweedfs.volume-size') or "60",
         "default_bucket_quota": cfg.get('seaweedfs.default-bucket-quota') or "1024",
-        "storage_class": cfg.get("openserverless.storageclass"),
+        "storageClass": cfg.get("openserverless.storageclass"),
         "pvcName":"seaweedfs-pvc",
         "seaweedfs_nuv_user": cfg.get('seaweedfs.openserverless.user') or "openserverless",
         "seaweedfs_nuv_password": cfg.get('seaweedfs.openserverless.password') or "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG",
