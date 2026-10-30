@@ -394,7 +394,7 @@ def service_update(old, new, name, **kwargs):
     cfg.put("config.apihost", apihost)
 
 @kopf.on.update('openserverless.org', 'v1', 'whisks')
-def whisk_update(spec, status, namespace, diff, name, **kwargs):
+def whisk_update(spec, status, namespace, diff, name, patch=None, **kwargs):
     logging.info(f"*** detected an update of wsk/{name} under namespace {namespace}")
     
     operator_util.config_from_spec(spec,handler_type="on_update")
@@ -406,6 +406,10 @@ def whisk_update(spec, status, namespace, diff, name, **kwargs):
     monitoring.reconcile(owner)
     seaweedfs.reconcile(owner)
     patcher.patch(diff, status, owner, name)
+    # The handler's status view is not a persistence request. Component
+    # patchers update its nested state; submit that state through Kopf.
+    if patch is not None and 'whisk_create' in status:
+        patch.status['whisk_create'] = dict(status['whisk_create'])
 
 @kopf.on.resume('openserverless.org', 'v1', 'whisks')
 def whisk_resume(spec, status, name, **kwargs):   
