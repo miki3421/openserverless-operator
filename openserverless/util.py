@@ -488,6 +488,10 @@ def check(f, what, res):
 
 # return redis configuration parameters with default values if not configured
 def get_redis_config_data():
+    persistence = cfg.get('redis.persistence-enabled') or False
+    acl_persistence = cfg.get('redis.acl-persistence-enabled') or False
+    if acl_persistence and not persistence:
+        raise ValueError('Redis ACL persistence requires a persistent data volume')
     # ensure prefix key contains : at the end to be compliant with REDIS script ACL creator
     prefix = cfg.get("redis.openserverless.prefix") or "openserverless:"
 
@@ -505,7 +509,8 @@ def get_redis_config_data():
         "namespace":"openserverless",
         "password":cfg.get("redis.openserverless.password") or "s0meP@ass3",
         "prefix": prefix,
-        "persistence": cfg.get("redis.persistence-enabled") or False,
+        "persistence": persistence,
+        "acl_persistence": acl_persistence,
         "maxmemory": cfg.get("redis.maxmemory") or "1000mb"
     }
 
@@ -873,11 +878,20 @@ def milvus_standalone_affinity_tolerations_data(data):
 
 # return milvus configuration parameter with default valued if not configured
 def get_milvus_config_data():
+    etcd_prefix = cfg.get('milvus.etcd.root-path') or 'milvus'
+    storage_prefix = cfg.get('milvus.storage.root-path') or 'files'
+    etcd_username = cfg.get('milvus.etcd.username') or 'etcdmilvus'
+    for prefix in (etcd_prefix, storage_prefix):
+        if not isinstance(prefix, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', prefix):
+            raise ValueError('Invalid Milvus storage or metadata prefix')
+    if not isinstance(etcd_username, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', etcd_username) or etcd_username == 'root':
+        raise ValueError('Invalid Milvus etcd service identity')
     data = {
-        'milvus_etcd_username': "etcdmilvus",
+        'milvus_etcd_username': etcd_username,
         'milvus_etcd_password': cfg.get('milvus.password.etcd') or "0therPa55",
         'milvus_etcd_root_password':cfg.get("etcd.root.password") or "s0meP@ass3wd",
-        'milvus_etcd_prefix': 'milvus',
+        'milvus_etcd_prefix': etcd_prefix,
+        'milvus_storage_root_path': storage_prefix,
         'milvus_s3_username': 'seaweedfsmilvus',
         'milvus_s3_password': cfg.get('milvus.password.s3') or "s0meP@ass3",
         'milvus_bucket_name': 'vectors',

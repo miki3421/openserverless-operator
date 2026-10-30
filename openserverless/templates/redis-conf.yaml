@@ -22,6 +22,10 @@ metadata:
 data:
     redis-conf: |
                 requirepass {{redis_password}}
+                {% if acl_persistence %}
+                # The migration adapter prepares this file before Redis starts.
+                aclfile /bitnami/redis/data/users.acl
+                {% endif %}
 
                 # bitnami:redis common setup
                 maxmemory {{maxmemory}}
