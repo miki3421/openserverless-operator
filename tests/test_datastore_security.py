@@ -16,6 +16,7 @@
 # under the License.
 
 import base64
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -23,7 +24,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from openserverless import config, datastore_security as security
+from openserverless import config, datastore_security as security, util
 
 
 class SecurityTests(unittest.TestCase):
@@ -100,6 +101,14 @@ class SecurityTests(unittest.TestCase):
         self.assertTrue(all(peer['podSelector']['matchLabels'] for peer in metrics[0]['from']))
         self.assertFalse(any('namespaceSelector' in peer for peer in metrics[0]['from']))
 
+    def test_milvus_image_includes_metrics_port_authentication_fix(self):
+        import yaml
+        root = Path(__file__).resolve().parents[1]
+        for profile in ['milvus', 'milvus-slim']:
+            manifest = yaml.safe_load((root/'deploy'/profile/'milvus.yaml').read_text())
+            container = manifest['spec']['template']['spec']['containers'][0]
+            self.assertEqual(container['image'], 'milvusdb/milvus:v2.5.27')
+
     def test_seaweedfs_service_has_no_node_ports(self):
         import yaml
         root = Path(__file__).resolve().parents[1]
@@ -134,20 +143,57 @@ class SecurityTests(unittest.TestCase):
     def test_seaweedfs_create_applies_isolation_policy(self):
         from openserverless import seaweedfs_deploy
         spec = {'apiVersion': 'v1', 'kind': 'List', 'items': []}
-        with patch.object(seaweedfs_deploy.util, 'get_seaweedfs_config_data', return_value={
-                'affinity': False, 'tolerations': False}), \
+        data = {'name': 'seaweedfs', 'affinity': False, 'tolerations': False}
+        with patch.object(seaweedfs_deploy.util, 'get_seaweedfs_config_data', return_value=data), \
                 patch.object(seaweedfs_deploy.kus, 'patchTemplates'), \
                 patch.object(seaweedfs_deploy.kus, 'kustom_list', return_value=spec), \
                 patch.object(seaweedfs_deploy.cfg, 'put'), \
                 patch.object(seaweedfs_deploy.kube, 'apply') as apply, \
                 patch.object(seaweedfs_deploy.util, 'wait_for_pod_ready'), \
                 patch.object(seaweedfs_deploy.seaweedfs_ingress, 'create_seaweedfs_ingresses'), \
-                patch.object(seaweedfs_deploy.util, 'wait_for_http'), \
-                patch.object(seaweedfs_deploy, 'create_seaweedfs_nuv_storage'):
+                patch.object(seaweedfs_deploy, 'service_endpoint', return_value=
+                             contextlib.nullcontext(('127.0.0.1', 41237))) as endpoint, \
+                patch.object(seaweedfs_deploy.util, 'wait_for_http') as wait, \
+                patch.object(seaweedfs_deploy, 'create_seaweedfs_nuv_storage') as bootstrap:
             seaweedfs_deploy.create()
         self.assertIn(security.policy('seaweedfs'), spec['items'])
         self.assertEqual(apply.call_args_list[0].args[0]['items'],
                          [security.policy('seaweedfs')])
+        endpoint.assert_called_once_with('seaweedfs', 9090)
+        wait.assert_called_once_with('http://127.0.0.1:41237', up_statuses=[200, 401], timeout=3)
+        bootstrap.assert_called_once_with(data, 'http://127.0.0.1:41237')
+
+    def test_seaweedfs_bootstrap_reopens_tunnel_after_startup_race(self):
+        from openserverless import seaweedfs_deploy
+        data = {'name': 'seaweedfs'}
+        tunnels = [contextlib.nullcontext(('127.0.0.1', 41237)),
+                   contextlib.nullcontext(('127.0.0.1', 41238))]
+        with patch.object(seaweedfs_deploy, 'service_endpoint', side_effect=tunnels) as endpoint, \
+                patch.object(seaweedfs_deploy.util, 'wait_for_http',
+                             side_effect=[TimeoutError('startup race'), None]) as wait, \
+                patch.object(seaweedfs_deploy, 'create_seaweedfs_nuv_storage') as bootstrap, \
+                patch.object(seaweedfs_deploy.time, 'sleep'):
+            seaweedfs_deploy._bootstrap_private_filer(data)
+        self.assertEqual(endpoint.call_count, 2)
+        self.assertEqual(wait.call_count, 2)
+        bootstrap.assert_called_once_with(data, 'http://127.0.0.1:41238')
+
+    def test_wait_for_http_raises_after_deadline(self):
+        with self.assertRaisesRegex(TimeoutError, 'did not become ready'):
+            util.wait_for_http('http://127.0.0.1:1', timeout=0)
+
+    def test_wait_for_http_keeps_accepted_status_behavior(self):
+        with patch.object(util.urllib3.connectionpool, 'HTTPConnectionPool') as pool:
+            pool.return_value.request.return_value.status = 401
+            util.wait_for_http('http://seaweedfs:9090', timeout=1, up_statuses=[200, 401])
+        pool.return_value.request.assert_called_once_with('GET', '/')
+
+    def test_seaweedfs_client_uses_explicit_private_endpoint(self):
+        from openserverless import seaweedfs_util
+        with patch.object(seaweedfs_util.util, 'get_pod_name_by_selector',
+                          return_value='seaweedfs-0'):
+            client = seaweedfs_util.SeaweedfsClient('http://127.0.0.1:41237')
+        self.assertEqual(client.filer_url, 'http://127.0.0.1:41237')
 
     def test_existing_cluster_reconcile_secures_before_service_update(self):
         from openserverless import seaweedfs_deploy
@@ -158,18 +204,24 @@ class SecurityTests(unittest.TestCase):
                    'spec': {'type': 'ClusterIP', 'ports': []}}
         events = []
         config.configure({'components': {'seaweedfs': True}})
-        with patch.object(seaweedfs_deploy.util, 'get_seaweedfs_config_data', return_value={}), \
+        with patch.object(seaweedfs_deploy.util, 'get_seaweedfs_config_data', return_value={'name': 'seaweedfs'}), \
                 patch.object(seaweedfs_deploy, '_render_seaweedfs_spec', return_value={
                     'apiVersion': 'v1', 'kind': 'List', 'items': [service]}), \
                 patch.object(seaweedfs_deploy.datastore_security, 'apply',
                              side_effect=lambda obj: events.append(('policy', obj))), \
                 patch.object(seaweedfs_deploy.kube, 'apply',
                              side_effect=lambda obj: events.append(('service', obj))), \
+                patch.object(seaweedfs_deploy, 'service_endpoint', return_value=
+                             contextlib.nullcontext(('127.0.0.1', 41237))), \
+                patch.object(seaweedfs_deploy, 'SeaweedfsClient') as client, \
+                patch.object(seaweedfs_deploy, 'reconcile_anonymous_web_access',
+                             side_effect=lambda obj: events.append(('iam', obj))), \
                 patch.object(seaweedfs_deploy.seaweedfs_ingress,
                              'create_seaweedfs_ingresses',
                              side_effect=lambda data, obj: events.append(('ingress', obj))):
             seaweedfs_deploy.reconcile(owner)
-        self.assertEqual([event[0] for event in events], ['policy', 'service', 'ingress'])
+        self.assertEqual([event[0] for event in events], ['policy', 'service', 'iam', 'ingress'])
+        client.assert_called_once_with('http://127.0.0.1:41237')
         self.assertEqual(events[0][1]['kind'], 'NetworkPolicy')
         self.assertEqual(events[1][1]['spec']['type'], 'ClusterIP')
 
