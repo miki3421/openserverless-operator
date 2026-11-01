@@ -17,6 +17,7 @@
 
 """Restored named Redis users must not disappear when the target pod restarts."""
 import ast
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
@@ -30,7 +31,8 @@ def configuration(values):
     node = next(n for n in ast.parse((ROOT / 'openserverless/util.py').read_text()).body
                 if isinstance(n, ast.FunctionDef) and n.name == 'get_redis_config_data')
     namespace = {'cfg': SimpleNamespace(get=lambda key, *args: values.get(key, args[-1] if args else None)),
-                 'get_enable_pod_security': lambda: False, 'redis_affinity_tolerations_data': lambda data: None}
+                 'get_enable_pod_security': lambda: False, 'redis_affinity_tolerations_data': lambda data: None,
+                 'hashlib': hashlib}
     exec(compile(ast.Module(body=[node], type_ignores=[]), 'util.py', 'exec'), namespace)
     return namespace['get_redis_config_data']()
 
@@ -46,6 +48,7 @@ class RedisRestoreMappingTests(unittest.TestCase):
     def test_explicit_restored_acl_file_remains_on_persistent_volume(self):
         text = self.render({'redis.persistence-enabled': True, 'redis.acl-persistence-enabled': True})
         self.assertIn('aclfile /bitnami/redis/data/users.acl', text)
+        self.assertEqual(text.count('aclfile /bitnami/redis/data/users.acl'), 1)
         self.assertIn('dir /bitnami/redis/data', text)
 
     def test_acl_state_cannot_be_requested_on_ephemeral_storage(self):
