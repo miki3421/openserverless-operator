@@ -37,7 +37,7 @@ SLOTS = {
     'openwhisk-enterprise': {'controller': 'controller', 'check-kafka': 'busybox'},
     'openwhisk-invoker': {'invoker': 'invoker', 'check-kafka': 'busybox'},
     'couchdb': {'couchdb': 'couchdb', 'check-couchdb': 'busybox', 'init-couchdb': 'operator'},
-    'redis': {'redis': 'redis'},
+    'redis': {'redis': 'redis', 'redis-acl-init': 'redis'},
     'ferretdb': {'ferretdb': 'ferretdb'},
     'etcd': {'openserverless-etcd': 'etcd'},
     'kafka': {'kafka': 'kafka', 'volume-exporter': 'volume_exporter',

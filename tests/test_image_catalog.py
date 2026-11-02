@@ -65,6 +65,16 @@ class ImageCatalogTests(unittest.TestCase):
         self.assertEqual(images.resolve('redis', original), expected)
         self.assertEqual(original['spec']['template']['spec']['containers'][0]['image'], 'redis:old')
 
+    def test_persistent_redis_template_resolves_main_and_acl_initializer(self):
+        reference='registry.local:5443/redis:pinned'
+        self.configure({'redis':reference})
+        template=(ROOT/'openserverless/templates/redis-set.yaml').read_text()
+        manifest=yaml.safe_load(Template(template).render(persistence=True,applypodsecurity=True,redis_password_sha256='a'*64))
+        resolved=images.resolve('redis',manifest)['spec']['template']['spec']
+        self.assertEqual(resolved['containers'][0]['image'],reference)
+        self.assertEqual(resolved['initContainers'][0]['name'],'redis-acl-init')
+        self.assertEqual(resolved['initContainers'][0]['image'],reference)
+
     def test_invalid_references_fail_before_render(self):
         for value in ('redis', '', 'https://registry/redis:1', 'redis:1\nother:2', 'redis@sha256:no', 42):
             with self.subTest(value=value):
