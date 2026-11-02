@@ -31,6 +31,7 @@ import redis as redislib
 from openserverless.redis_acl import tenant_rules
 from openserverless.datastore_connection import service_endpoint
 import os, os.path
+import time
 import logging, json
 import kopf
 import openserverless.operator_util as operator_util
@@ -132,6 +133,21 @@ def create(owner=None):
 def wait_for_redis_ready():
     # dynamically detect redis pod and wait for readiness
     util.wait_for_pod_ready("{.items[?(@.metadata.labels.name == 'redis')].metadata.name}")
+    # A Ready Pod can precede the Service's EndpointSlice propagation. The
+    # initial ACL operation uses that Service, so verify it before provisioning.
+    deadline = time.monotonic() + 60
+    while True:
+        try:
+            with admin_client() as client:
+                if client.ping():
+                    return
+        except redislib.exceptions.AuthenticationError:
+            raise
+        except (redislib.exceptions.ConnectionError, redislib.exceptions.TimeoutError):
+            pass
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Redis service did not become reachable after Pod readiness')
+        time.sleep(1)
 
 def restore_openserverless_db_user():
     data = util.get_redis_config_data()

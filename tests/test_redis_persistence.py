@@ -50,6 +50,18 @@ class RedisAclPersistenceTests(unittest.TestCase):
         self.client.acl_setuser.assert_not_called()
         self.client.acl_deluser.assert_not_called()
 
+    def test_service_propagation_is_waited_after_pod_readiness(self):
+        self.client.ping.side_effect=[redis.redislib.exceptions.ConnectionError('not ready'),True]
+        with patch.object(redis.util,'wait_for_pod_ready'),patch.object(redis,'admin_client',return_value=self.client),patch.object(redis.time,'sleep') as sleep:
+            redis.wait_for_redis_ready()
+        self.assertEqual(self.client.ping.call_count,2);sleep.assert_called_once_with(1)
+
+    def test_service_wait_never_retries_an_authentication_error(self):
+        self.client.ping.side_effect=redis.redislib.exceptions.AuthenticationError('wrong credential')
+        with patch.object(redis.util,'wait_for_pod_ready'),patch.object(redis,'admin_client',return_value=self.client),patch.object(redis.time,'sleep') as sleep:
+            with self.assertRaises(redis.redislib.exceptions.AuthenticationError):redis.wait_for_redis_ready()
+        sleep.assert_not_called()
+
     def test_ephemeral_installation_does_not_enable_acl_storage(self):
         self.data['persistence'] = False
         self.client.config_get.return_value = {'aclfile': ''}
