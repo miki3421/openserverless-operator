@@ -71,7 +71,7 @@ def resources(namespace="openserverless", size=10, storage_class="local-path", a
                  "livenessProbe":{"tcpSocket":{"port":27017},"periodSeconds":10,"failureThreshold":6}}
     sts={"apiVersion":"apps/v1","kind":"StatefulSet","metadata":metadata(NAME),"spec":{"serviceName":SERVICE,"replicas":1,"selector":{"matchLabels":{"app":NAME}},
          "template":{"metadata":{"annotations":{"whisks.openserverless.org/annotate-version":"true"},"labels":{"app":NAME,"name":NAME,"ops-advanced/backend":PROFILE["backend"]}},"spec":{"automountServiceAccountToken":False,"securityContext":{"fsGroup":999},
-                      "initContainers":[{"name":"keyfile","image":PROFILE["image"],"command":["sh","-c","cp /run/source/keyfile /run/target/keyfile && chmod 400 /run/target/keyfile"],"securityContext":security,"volumeMounts":[{"name":"auth","mountPath":"/run/source","readOnly":True},{"name":"keyfile","mountPath":"/run/target"}]}],
+                      "initContainers":[{"name":"keyfile","image":PROFILE["image"],"command":["sh","-c","cp --remove-destination /run/source/keyfile /run/target/keyfile && chmod 400 /run/target/keyfile"],"securityContext":security,"volumeMounts":[{"name":"auth","mountPath":"/run/source","readOnly":True},{"name":"keyfile","mountPath":"/run/target"}]}],
                       "containers":[container],"volumes":[{"name":"auth","secret":{"secretName":PROFILE["secret"],"defaultMode":288}},{"name":"keyfile","emptyDir":{}},{"name":"probe","configMap":{"name":NAME+"-probe"}}]}},
          "volumeClaimTemplates":[{"metadata":{"name":NAME+"-pvc"},"spec":{"accessModes":["ReadWriteOnce"],"storageClassName":storage_class,"resources":{"requests":{"storage":str(size)+"Gi"}}}}]}}
     pod=sts["spec"]["template"]["spec"]

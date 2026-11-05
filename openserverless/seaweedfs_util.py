@@ -19,6 +19,7 @@
 # to perform various operations
 
 import logging
+import json
 import subprocess
 import re
 import openserverless.config as cfg
@@ -47,8 +48,8 @@ class SeaweedfsUnauthorizedException(SeaweedfsSimpleException):
 
 class SeaweedfsClient:
     
-    def __init__(self):
-        self.filer_url = util.get_seaweedds_filer_host()
+    def __init__(self, filer_url=None):
+        self.filer_url = filer_url or util.get_seaweedds_filer_host()
         self.pod_name = util.get_pod_name_by_selector("app=seaweedfs","{.items[?(@.metadata.labels.app == 'seaweedfs')].metadata.name}")
 
     def _request(self, endpoint: str, json=None, method: str = "POST"):
@@ -86,7 +87,7 @@ class SeaweedfsClient:
             if e.response.status_code == 403:
                 raise SeaweedfsUnauthorizedException()
 
-    def _exec_weed_command(self, command, missing_user=None):
+    def _exec_weed_command(self, command, missing_user=None, return_output=False):
         # weed shell also interprets semicolons as command separators.
         if not isinstance(command, str) or re.search(r"[\n\r;]", command):
             raise ValueError("invalid characters in weed shell command")
@@ -109,7 +110,7 @@ class SeaweedfsClient:
             result.stderr,
         ):
             raise RuntimeError("SeaweedFS administration command failed")
-        return True
+        return result.stdout if return_output else True
 
     def make_bucket(self, bucket_name, quota_in_mb=None):
         """
@@ -174,6 +175,35 @@ class SeaweedfsClient:
             raise ValueError("Invalid public bucket name")
         command = f's3.configure -user=anonymous -actions=Read -buckets={bucket} -delete -apply'
         return util.check(self._exec_weed_command(command), "remove_anonymous_web_access", True)
+
+    def verify_anonymous_access(self, buckets):
+        """Fail closed if persisted anonymous IAM differs from the web allowlist."""
+        try:
+            # SeaweedFS 4.x stores IAM through its IAM service. The former
+            # filer identity.json path can be absent even after a valid write.
+            # Read the authoritative configuration without applying any change.
+            def unique(pairs):
+                value = {}
+                for key, item in pairs:
+                    if key in value:
+                        raise ValueError()
+                    value[key] = item
+                return value
+            raw = self._exec_weed_command("s3.configure", return_output=True)
+            identities = json.loads(raw, object_pairs_hook=unique)["identities"]
+            if not isinstance(identities, list):
+                raise ValueError()
+            anonymous = [item for item in identities if item["name"] == "anonymous"]
+            expected = {f"Read:{bucket}" for bucket in buckets}
+            if len(anonymous) != 1:
+                raise ValueError()
+            if anonymous[0].get("policyNames"):
+                raise ValueError()
+            actions = anonymous[0]["actions"]
+            if not isinstance(actions, list) or any(not isinstance(action, str) for action in actions) or set(actions) != expected:
+                raise ValueError()
+        except (requests.RequestException, subprocess.SubprocessError, RuntimeError, OSError, ValueError, KeyError, TypeError):
+            raise RuntimeError("Could not verify anonymous S3 web-only grants") from None
 
     def make_public_bucket(self, bucket_name):
         """

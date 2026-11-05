@@ -16,6 +16,9 @@
 # under the License.
 
 import json
+import subprocess
+import contextlib
+import requests
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -23,6 +26,96 @@ from openserverless import seaweedfs_deploy
 
 
 class AnonymousS3AccessTest(unittest.TestCase):
+    @patch.object(seaweedfs_deploy.SeaweedfsClient, "_exec_weed_command")
+    @patch.object(seaweedfs_deploy.SeaweedfsClient, "__init__", return_value=None)
+    def test_persisted_policy_must_match_web_only_even_if_native_shell_succeeded(self, init, command):
+        client = seaweedfs_deploy.SeaweedfsClient()
+        command.return_value = json.dumps({"identities": [
+            {"name": "anonymous", "actions": ["Read:custom-web"]},
+            {"name": "tenant", "actions": ["Read:private-data", "Write:private-data"]},
+        ]})
+        client.verify_anonymous_access({"custom-web"})
+        command.assert_called_once_with("s3.configure", return_output=True)
+        invalid = [{"identities": [{"name": "anonymous", "actions": actions}]}
+                   for actions in (["Read"], ["Read:custom-web", "Read:private-data"], [], ["Write:custom-web"])]
+        invalid += [{}, {"identities": None}, {"identities": []}, {"identities": [None]},
+                    {"identities": [{"name": "anonymous", "actions": None}]},
+                    {"identities": [{"name": "anonymous", "actions": {"Read:custom-web": True}}]},
+                    {"identities": [{"name": "anonymous", "actions": ["Read:custom-web"]}] * 2},
+                    {"identities": [{"name": "anonymous", "actions": ["Read:custom-web"], "policyNames": ["admin"]}]}]
+        for document in invalid:
+            command.return_value = json.dumps(document)
+            with self.subTest(document=document), self.assertRaises(RuntimeError):
+                client.verify_anonymous_access({"custom-web"})
+        for raw in ('not-json', '{"identities": [], "identities": []}'):
+            command.return_value = raw
+            with self.assertRaises(RuntimeError):
+                client.verify_anonymous_access({"custom-web"})
+        command.side_effect = RuntimeError("PRIVATE_CANARY")
+        with self.assertRaisesRegex(RuntimeError, "^Could not verify anonymous S3 web-only grants$") as raised:
+            client.verify_anonymous_access({"custom-web"})
+        self.assertNotIn("PRIVATE_CANARY", str(raised.exception))
+
+    @patch("openserverless.seaweedfs_util.subprocess.run")
+    def test_authoritative_iam_read_is_non_mutating_and_hides_shell_errors(self, run):
+        client = seaweedfs_deploy.SeaweedfsClient.__new__(seaweedfs_deploy.SeaweedfsClient)
+        client.pod_name = "synthetic-seaweedfs-0"
+        document = json.dumps({"identities": [{"name": "anonymous", "actions": ["Read:alpha-web"]}]})
+        run.return_value = subprocess.CompletedProcess([], 0, document, "")
+        client.verify_anonymous_access({"alpha-web"})
+        self.assertEqual(run.call_args.kwargs["input"], "s3.configure\n")
+        self.assertNotIn("-apply", run.call_args.kwargs["input"])
+        for result in [subprocess.CompletedProcess([], 1, document, "PRIVATE_CANARY"),
+                       subprocess.CompletedProcess([], 0, document, "error: PRIVATE_CANARY")]:
+            run.return_value = result
+            with self.assertRaisesRegex(RuntimeError, "^Could not verify anonymous S3 web-only grants$"):
+                client.verify_anonymous_access({"alpha-web"})
+
+    def test_failed_iam_reconciliation_does_not_publish_ingress_or_bootstrap_storage(self):
+        owner = {"metadata": {"uid": "synthetic"}}
+        seaweedfs_deploy.cfg.configure({"components": {"seaweedfs": True}})
+        with patch.object(seaweedfs_deploy.util, "get_seaweedfs_config_data", return_value={"name": "seaweedfs"}), \
+                patch.object(seaweedfs_deploy, "_render_seaweedfs_spec", return_value={"items": [
+                    {"kind": "Service", "metadata": {"name": "seaweedfs"}}]}), \
+                patch.object(seaweedfs_deploy.datastore_security, "apply"), \
+                patch.object(seaweedfs_deploy.kube, "apply"), \
+                patch.object(seaweedfs_deploy, "service_endpoint", return_value=contextlib.nullcontext(("seaweedfs", 9090))), \
+                patch.object(seaweedfs_deploy, "SeaweedfsClient"), \
+                patch.object(seaweedfs_deploy, "reconcile_anonymous_web_access", side_effect=RuntimeError("IAM unavailable")), \
+                patch.object(seaweedfs_deploy.seaweedfs_ingress, "create_seaweedfs_ingresses") as ingress, \
+                patch.object(seaweedfs_deploy, "create_seaweedfs_nuv_storage") as bootstrap:
+            with self.assertRaisesRegex(RuntimeError, "IAM unavailable"):
+                seaweedfs_deploy.reconcile(owner)
+        ingress.assert_not_called()
+        bootstrap.assert_not_called()
+
+    def test_grants_are_bucket_scoped_and_reject_invalid_names(self):
+        client = seaweedfs_deploy.SeaweedfsClient.__new__(seaweedfs_deploy.SeaweedfsClient)
+        client._exec_weed_command = Mock(return_value=True)
+        self.assertTrue(client.add_anonymous_access(["beta-web", "alpha-web"]))
+        client._exec_weed_command.assert_called_once_with(
+            "s3.configure -user=anonymous -actions=Read -buckets=alpha-web,beta-web -apply")
+        for buckets in ([], ["bad,bucket"], ["bad\n-command"]):
+            client._exec_weed_command.reset_mock()
+            with self.assertRaises(ValueError):
+                client.add_anonymous_access(buckets)
+            client._exec_weed_command.assert_not_called()
+
+    def test_bucket_revocation_does_not_remove_other_public_grants(self):
+        client = seaweedfs_deploy.SeaweedfsClient.__new__(seaweedfs_deploy.SeaweedfsClient)
+        client._exec_weed_command = Mock(return_value=True)
+        self.assertTrue(client.remove_anonymous_access("alpha-web"))
+        client._exec_weed_command.assert_called_once_with(
+            "s3.configure -user=anonymous -actions=Read -buckets=alpha-web -delete -apply")
+
+    @patch.object(seaweedfs_deploy, "_configured_storage_buckets", return_value=({"alpha-web"}, {"alpha-data"}))
+    def test_failed_legacy_revoke_never_adds_grants(self, buckets):
+        client = Mock()
+        client.delete_user.return_value = False
+        with self.assertRaises(RuntimeError):
+            seaweedfs_deploy.reconcile_anonymous_web_access(client)
+        client.add_anonymous_access.assert_not_called()
+
     @patch.object(seaweedfs_deploy, "SeaweedfsClient")
     def test_failed_revoke_preserves_web_bucket_and_identity_until_retry(self, factory):
         config = Mock()
@@ -113,7 +206,7 @@ class AnonymousS3AccessTest(unittest.TestCase):
         client.delete_user.return_value = True
         client.add_anonymous_access.return_value = True
         seaweedfs_deploy.reconcile_anonymous_web_access(client)
-        client.delete_user.assert_called_once_with("anonymous")
+        client.delete_user.assert_called_once_with("anonymous", missing_ok=True)
         client.add_anonymous_access.assert_called_once_with({"openserverless-web", "alpha-web"})
 
     @patch.object(seaweedfs_deploy.kube, "kubectl")
@@ -127,7 +220,7 @@ class AnonymousS3AccessTest(unittest.TestCase):
         client.add_anonymous_access.return_value = True
         with self.assertRaisesRegex(ValueError, "overlap"):
             seaweedfs_deploy.reconcile_anonymous_web_access(client)
-        client.delete_user.assert_called_once_with("anonymous")
+        client.delete_user.assert_called_once_with("anonymous", missing_ok=True)
         client.add_anonymous_access.assert_called_once_with({"openserverless-web"})
 
     @patch.object(seaweedfs_deploy.SeaweedfsClient, "__init__", return_value=None)

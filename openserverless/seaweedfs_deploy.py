@@ -23,13 +23,22 @@ import openserverless.util as util
 import openserverless.openwhisk as openwhisk
 import openserverless.seaweedfs_ingress as seaweedfs_ingress
 import openserverless.operator_util as operator_util
+import openserverless.datastore_security as datastore_security
 
+from openserverless.datastore_connection import service_endpoint
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
 from openserverless.seaweedfs_util import SeaweedfsClient
 
 def _get_seaweedfs_service():
     return util.get_service("{.items[?(@.spec.selector.app == 'seaweedfs')]}")
+
+def _render_seaweedfs_spec(data):
+    tplp = ["pvc-attach.yaml"]
+    if data['affinity'] or data['tolerations']:
+        tplp.append("affinity-tolerance-sts-core-attach.yaml")
+    kust = kus.patchTemplates("seaweedfs", tplp, data)
+    return kus.kustom_list("seaweedfs", kust, templates=[], data=data)
 
 def _add_seaweedfs_user_metadata(ucfg: UserConfig, user_metadata:UserMetadata):
     """
@@ -78,18 +87,45 @@ def _check_storage_compatibility(spec):
         if kube.kubectl('get', 'pvc', claim, '--ignore-not-found', '-o', 'json').strip():
             raise RuntimeError('Existing SeaweedFS PVC without its StatefulSet; implicit data reuse is disabled')
 
+def _bootstrap_private_filer(data, timeout=30):
+    """Wait for the private filer, recreating a tunnel lost during startup."""
+    deadline = time.monotonic() + timeout
+    last_error = None
+
+    while time.monotonic() < deadline:
+        ready = False
+        try:
+            with service_endpoint(data['name'], 9090) as (host, port):
+                filer_url = f"http://{host}:{port}"
+                try:
+                    # A port-forward can exit after its first connection if the
+                    # target socket is not listening yet. Keep each probe short
+                    # so the next attempt can establish a fresh tunnel.
+                    util.wait_for_http(filer_url, up_statuses=[200, 401], timeout=3)
+                except TimeoutError as error:
+                    last_error = error
+                else:
+                    ready = True
+                    create_seaweedfs_nuv_storage(data, filer_url)
+                    return
+        except RuntimeError as error:
+            if ready:
+                raise
+            last_error = error
+
+        if time.monotonic() < deadline:
+            time.sleep(1)
+
+    raise TimeoutError("SeaweedFS filer did not become ready before timeout") from last_error
+
 def create(owner=None):
     logging.info("*** configuring seaweedfs standalone")
 
     data = util.get_seaweedfs_config_data()
 
-    tplp = ["pvc-attach.yaml"]
-
-    if(data['affinity'] or data['tolerations']):
-       tplp.append("affinity-tolerance-sts-core-attach.yaml")    
-
-    kust = kus.patchTemplates("seaweedfs", tplp, data)
-    spec = kus.kustom_list("seaweedfs", kust, templates=[], data=data)
+    spec = _render_seaweedfs_spec(data)
+    policy = datastore_security.policy('seaweedfs')
+    spec['items'].append(policy)
     _check_storage_compatibility(spec)
 
     if owner:
@@ -97,19 +133,47 @@ def create(owner=None):
     else:
         cfg.put("state.seaweedfs.spec", spec)
 
+    # Establish the deny-by-default boundary before creating any listener.
+    datastore_security.apply(policy)
     res = kube.apply(spec)
 
     # dynamically detect seaweedfs pod and wait for readiness
     util.wait_for_pod_ready("{.items[?(@.metadata.labels.app == 'seaweedfs')].metadata.name}")
     seaweedfs_ingress.create_seaweedfs_ingresses(data, owner)
 
-    logging.info("*** waiting for seaweedfs filer api to be available")    
-    util.wait_for_http(util.get_seaweedds_filer_host(), up_statuses=[200,401], timeout=30)
-
-    create_seaweedfs_nuv_storage(data)  
+    # The filer API is private. In-cluster this resolves to the Service;
+    # integration runs use an authenticated, loopback-only port-forward.
+    logging.info("*** waiting for seaweedfs filer api to be available")
+    _bootstrap_private_filer(data)
 
     logging.info("*** configured seaweedfs standalone")
     return res
+
+def reconcile(owner=None):
+    """Secure an existing SeaweedFS deployment without recreating tenant data."""
+    if not cfg.get('components.seaweedfs'):
+        return None
+    if not owner or not owner.get('metadata', {}).get('uid'):
+        raise RuntimeError('Whisk owner is required to reconcile SeaweedFS isolation')
+
+    data = util.get_seaweedfs_config_data()
+    rendered = _render_seaweedfs_spec(data)
+    services = [item for item in rendered['items']
+                if item['kind'] == 'Service' and item['metadata']['name'] == 'seaweedfs']
+    if len(services) != 1:
+        raise RuntimeError('Could not render the SeaweedFS service')
+
+    policy = datastore_security.policy('seaweedfs')
+    resources = [policy, services[0]]
+    kopf.append_owner_reference(resources, owner)
+    datastore_security.apply(policy)
+    result = kube.apply(services[0])
+    # Existing deployments and restored filer data can still carry global Read.
+    # Normalize IAM before publishing ingress, without bootstrapping buckets.
+    with service_endpoint(data['name'], 9090) as (host, port):
+        reconcile_anonymous_web_access(SeaweedfsClient(f"http://{host}:{port}"))
+    seaweedfs_ingress.create_seaweedfs_ingresses(data, owner)
+    return result
 
 def _annotate_nuv_metadata(data):
     """
@@ -162,13 +226,16 @@ def reconcile_anonymous_web_access(client):
         raise RuntimeError("Could not grant public access to web buckets")
     if web_buckets & private_buckets:
         raise ValueError("Public and private S3 bucket names overlap")
+    # Native shell commands may return success even when an operation failed.
+    # Read back the persisted policy before accepting reconciliation.
+    client.verify_anonymous_access(safe_web_buckets)
 
-def create_seaweedfs_nuv_storage(data):
+def create_seaweedfs_nuv_storage(data, filer_url=None):
     """
     Creates openserverless SEAWEEDFS custom resources
     """
     logging.info("*** configuring SEAWEEDFS storage for openserverless")
-    seaweedsfsClient = SeaweedfsClient()
+    seaweedsfsClient = SeaweedfsClient(filer_url)
 
     res = seaweedsfsClient.make_bucket("openserverless-data",data["default_bucket_quota"])
     if res:
