@@ -96,7 +96,15 @@ spec:
             - localhost:9092
             - --version
       - name: volume-exporter
-        image: "ghcr.io/nuvolaris/volume_exporter:1.0.0.2311032017"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        image: "localhost/ops-advanced-volume-exporter:20261105-r2"
         imagePullPolicy: "IfNotPresent"
         args:
           - --volume-dir=kafka-volume:/kafka
