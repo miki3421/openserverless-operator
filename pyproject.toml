@@ -34,9 +34,15 @@ croniter = "^1.3.5"
 minio = "^7.1.13"
 backoff = "^2.2.1"
 pg8000 = "^1.31.2"
-pymongo = "4.18.2"
+pymongo = "4.18.3"
 redis = "^5.0.4"
 bcrypt = "^4.2.1"
+# Shared HTTP/auth dependencies: retain compatible security floors.
+aiohttp = ">=3.14.4,<4"
+certifi = ">=2026.10.18"
+oauthlib = ">=4.0.0,<5"
+pyasn1 = ">=0.6.5,<0.7"
+urllib3 = ">=2.8.0,<3"
 
 [tool.poetry.group.dev.dependencies]
 ipython = "^8.15.0"

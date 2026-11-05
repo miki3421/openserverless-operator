@@ -75,7 +75,7 @@ ADD --chown=openserverless:openserverless quota.sh /home/openserverless/
 FROM python:3.12-slim-bookworm AS deps
 
 # --- Install Poetry ---
-ARG POETRY_VERSION=2.3.2
+ARG POETRY_VERSION=2.3.3
 ENV POETRY_HOME=/opt/poetry
 ENV POETRY_NO_INTERACTION=1
 ENV POETRY_VIRTUALENVS_IN_PROJECT=1
@@ -111,7 +111,7 @@ ENV TZ=Europe/London
 ENV HOME=/home/openserverless
 ENV VIRTUAL_ENV=/home/openserverless/.venv
 ENV POETRY_HOME=/opt/poetry
-ENV POETRY_CACHE_DIR=/opt/.cache
+ENV POETRY_CACHE_DIR=/home/openserverless/.cache/pypoetry
 ENV PATH=$POETRY_HOME/bin:$HOME/.venv/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/sbin:/bin:/usr/sbin/
 # configure dpkg && timezone
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
@@ -145,7 +145,9 @@ COPY --from=deps --chown=openserverless:openserverless ${VIRTUAL_ENV} ${VIRTUAL_
 COPY --from=deps --chown=openserverless:openserverless ${POETRY_HOME} ${POETRY_HOME}
 # Copy the home
 COPY --from=sources --chown=openserverless:openserverless ${HOME} ${HOME}
-RUN poetry install --only main --no-interaction --no-ansi && rm -rf ${POETRY_CACHE_DIR}
+RUN ${VIRTUAL_ENV}/bin/python -m pip install --no-cache-dir "pip==26.3" && \
+    ${POETRY_HOME}/venv/bin/python -m pip install --no-cache-dir "pip==26.3" && \
+    poetry install --only main --no-interaction --no-ansi && rm -rf ${POETRY_CACHE_DIR}
 # prepares the required folders to deploy the whisk-system actions
 RUN mkdir -p /home/openserverless/deploy/whisk-system && \
     ./whisk-system.sh && \

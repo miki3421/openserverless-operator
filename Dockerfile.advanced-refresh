@@ -1,0 +1,15 @@
+# Preserve the qualified source, deploy.tar and platform tool versions.
+# Verify the base manifest against docs/advanced-python-refresh.md before building.
+ARG BASE_IMAGE=localhost/ops-advanced-security-aligned:20261105-r3
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN /home/openserverless/.venv/bin/python -m pip install --no-cache-dir "pip==26.3" && /opt/poetry/venv/bin/python -m pip install --no-cache-dir "pip==26.3"
+RUN /opt/poetry/venv/bin/python -m pip install --no-cache-dir "poetry==2.3.3" && /opt/poetry/venv/bin/python -m pip check
+COPY --chown=1001:1001 pyproject.toml poetry.lock /home/openserverless/
+USER openserverless
+RUN POETRY_CACHE_DIR=/tmp/poetry-build-cache poetry install --only main --no-interaction --no-ansi && rm -rf /tmp/poetry-build-cache && /home/openserverless/.venv/bin/python -m pip check
+USER root
+# Remove build caches only; the installed environments and Poetry entrypoints remain.
+RUN rm -rf /opt/.cache /home/openserverless/.cache /root/.cache
+USER openserverless
