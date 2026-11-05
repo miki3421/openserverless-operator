@@ -511,12 +511,10 @@ def get_service(jsonpath,namespace="openserverless"):
     raise Exception(f"could not find any svc matching jsonpath={jsonpath}")
 
 # return postgres configuration parameter with default valued if not configured
-def get_postgres_config_data():
+def get_postgres_config_data(create=False, owner=None):
+    from openserverless.postgres_credentials import credentials
     data = {
-        'postgres_root_password': cfg.get('postgres.admin.password') or "0therPa55",
-        'postgres_root_replica_password': cfg.get('postgres.admin.password') or "0therPa55sd",
         'postgres_openserverless_user': "openserverless",
-        'postgres_openserverless_password': cfg.get('postgres.openserverless.password') or "s0meP@ass3",
         'size': cfg.get('postgres.volume-size') or 10,
         'replicas': cfg.get('postgres.replicas') or 2,
         'storageClass': cfg.get('openserverless.storageclass'),
@@ -524,6 +522,7 @@ def get_postgres_config_data():
         'backup': cfg.get('postgres.backup.enabled') or False,
         'schedule': cfg.get('postgres.backup.schedule') or '30 * * * *'
         }
+    data.update(credentials(create=create, owner=owner))
     postgres_affinity_tolerations_data(data)
     return data
 
@@ -868,7 +867,7 @@ def get_milvus_config_data():
         'milvus_etcd_username': "etcdmilvus",
         'milvus_etcd_password': cfg.get('milvus.password.etcd') or "0therPa55",
         'milvus_etcd_root_password':cfg.get("etcd.root.password") or "s0meP@ass3wd",
-        'milvus_etcd_prefix': 'milvus',
+        'milvus_etcd_prefix': 'milvus-etcd-v37',
         'milvus_s3_username': 'seaweedfsmilvus',
         'milvus_s3_password': cfg.get('milvus.password.s3') or "s0meP@ass3",
         'milvus_bucket_name': 'vectors',

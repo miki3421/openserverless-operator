@@ -54,7 +54,7 @@ spec:
       initContainers:
       containers:
       - name: standalone
-        image: "docker.io/miki3421/ops-advanced-milvus:3.0.2-zero-grace-20261016@sha256:2d0aeb4c19a657369636a1592d56ccac164a718a3f447ee7683ce53769153c37"
+        image: "docker.io/miki3421/ops-advanced-milvus:3.0.2-zero-grace-20261016@sha256:40e575fa5d4f7fc717ecf9fc0a4d980848a41d47804788eb92e9a383f5f4f3f2"
         imagePullPolicy: IfNotPresent
         args: [ "milvus", "run", "standalone"]
         ports:
@@ -136,8 +136,9 @@ spec:
       - emptyDir: {}
         name: tools
       - name: milvus-config
-        configMap:
-          name: openserverless-milvus
+        secret:
+          secretName: openserverless-milvus
+          defaultMode: 0440
       - name: milvus-data-disk
         persistentVolumeClaim:
           claimName: openserverless-milvus-etcd37

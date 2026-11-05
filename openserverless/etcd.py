@@ -32,7 +32,7 @@ import openserverless.kube as kube
 import openserverless.template as ntp
 import openserverless.util as util
 import openserverless.operator_util as operator_util
-from openserverless import etcd_tls
+from openserverless import etcd_tls, datastore_security
 
 IMAGE = 'docker.io/miki3421/ops-advanced-etcd:3.7.2-20261016@sha256:02969ce1a6172cfd0d4363224e6fc8e9de3051bc43dd384ae82af5ffbca5e3ea'
 LAYOUT = 'v37'
@@ -72,6 +72,7 @@ def _build_spec(data):
             'metadata':{'name':data['name'],'namespace':data['namespace']},
             'spec':{'minAvailable':replicas//2+1,
                     'selector':{'matchLabels':{'app.kubernetes.io/name':data['name']}}}})
+    items.append(datastore_security.policy('etcd'))
     return {'apiVersion':'v1','kind':'List','items':items}
 
 
@@ -246,7 +247,7 @@ def _admin():
         yield session,endpoint
 
 
-def create_etcd_user(username, password, prefix):
+def create_etcd_user(username, password, prefix, readonly_keys=()):
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',username) or username=='root' or not prefix.strip('/'):
         raise ValueError('Invalid etcd user or key prefix')
     try:
@@ -262,7 +263,21 @@ def create_etcd_user(username, password, prefix):
             end=bytearray(key);end[-1]+=1
             _post(session,endpoint,'auth/role/grant',{'name':role,'perm':{'permType':'READWRITE',
                 'key':base64.b64encode(key).decode(),'range_end':base64.b64encode(end).decode()}})
+            for exact_key in readonly_keys:
+                _post(session, endpoint, 'auth/role/grant', {'name': role, 'perm': {
+                    'permType': 'READ', 'key': base64.b64encode(exact_key.encode()).decode()}})
             _post(session,endpoint,'auth/user/grant',{'user':username,'role':role})
+            identity = _post(session, endpoint, 'auth/user/get', {'name': username})
+            permissions = _post(session, endpoint, 'auth/role/get', {'role': role}).get('perm', [])
+            expected = {'permType': 'READWRITE', 'key': base64.b64encode(key).decode(),
+                        'range_end': base64.b64encode(end).decode()}
+            expected_permissions = [expected] + [
+                {'permType': 'READ', 'key': base64.b64encode(k.encode()).decode()}
+                for k in readonly_keys]
+            def normalized(values):
+                return sorted((v.get('permType', 'READ'), v['key'], v.get('range_end', '')) for v in values)
+            if identity.get('roles') != [role] or normalized(permissions) != normalized(expected_permissions):
+                raise RuntimeError('Existing etcd account exceeds the required prefix scope')
         return True
     except RuntimeError:
         logging.error('Could not provision the etcd user')

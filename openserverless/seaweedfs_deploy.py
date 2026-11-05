@@ -155,7 +155,7 @@ def reconcile_anonymous_web_access(client):
     web_buckets, private_buckets = _configured_storage_buckets()
     # Delete the identity before adding grants: legacy configurations may
     # contain both an unscoped grant and stale bucket-scoped grants.
-    if not client.delete_user("anonymous"):
+    if not client.delete_user("anonymous", missing_ok=True):
         raise RuntimeError("Could not revoke existing anonymous S3 grants")
     safe_web_buckets = web_buckets - private_buckets
     if not client.add_anonymous_access(safe_web_buckets):

@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+from openserverless import etcd, datastore_security
 import time
 import json
 import yaml
@@ -83,8 +84,16 @@ def _check_storage_compatibility(spec):
                    and item['metadata']['name'] == 'openserverless-milvus-standalone')
     current = kube.kubectl('get', 'deployment', desired['metadata']['name'],
                            '--ignore-not-found', '-o', 'json')
-    config = kube.kubectl('get', 'configmap', 'openserverless-milvus',
-                          '--ignore-not-found', '-o', 'json')
+    config = kube.kubectl('get', 'secret', 'openserverless-milvus',
+                          '--ignore-not-found', '-o', 'json', debugresult=False)
+    if config.strip():
+        import base64
+        value = json.loads(config)
+        value['data'] = {k: base64.b64decode(v).decode() for k, v in value['data'].items()}
+        config = json.dumps(value)
+    else:
+        config = kube.kubectl('get', 'configmap', 'openserverless-milvus',
+                              '--ignore-not-found', '-o', 'json', debugresult=False)
     if current.strip():
         actual = json.loads(current)
         if (actual['spec']['template']['spec']['containers'][0]['image'] !=
@@ -92,10 +101,10 @@ def _check_storage_compatibility(spec):
             raise RuntimeError('Existing Milvus image differs; automatic data upgrades are disabled')
         if not config.strip():
             raise RuntimeError('Existing Milvus deployment has no configuration; review its storage before proceeding')
-        wanted_cm = next(item for item in spec['items'] if item.get('kind') == 'ConfigMap'
+        wanted_cm = next(item for item in spec['items'] if item.get('kind') == 'Secret'
                          and item['metadata']['name'] == 'openserverless-milvus')
         actual_cfg = yaml.safe_load(json.loads(config)['data']['default.yaml'])
-        wanted_cfg = yaml.safe_load(wanted_cm['data']['default.yaml'])
+        wanted_cfg = yaml.safe_load(wanted_cm['stringData']['default.yaml'])
         for section, key in [('etcd', 'rootPath'), ('etcd', 'ssl'), ('etcd', 'endpoints'), ('minio', 'bucketName'),
                              ('minio', 'rootPath'), ('mq', 'type')]:
             if actual_cfg.get(section, {}).get(key) != wanted_cfg.get(section, {}).get(key):
@@ -133,12 +142,14 @@ def create(owner=None):
     if res:
         logging.info(f"*** creating a {dir} standalone instance")
 
+        mspec["items"].append(datastore_security.policy("milvus"))
         if owner:
             kopf.append_owner_reference(mspec['items'], owner)
         else:
             cfg.put("state.milvus.spec", mspec)
 
-        kube.apply(mspec)
+        datastore_security.apply(mspec)
+        datastore_security.finish_milvus_reconcile()
         util.wait_for_pod_ready(
             r"{.items[?(@.metadata.labels.app\.kubernetes\.io\/instance == 'openserverless-milvus')].metadata.name}")
 
@@ -171,9 +182,9 @@ def create_milvus_accounts(data: dict):
     """"
     Creates technical accounts for ETCD and SEAWEEDFS
     """
-    # currently we use the ETCD root password, so we skip the ETCD user creation.
-    # res = util.check(etcd.create_etcd_user(data['milvus_etcd_username'],data['milvus_etcd_password'],data['milvus_etcd_prefix']),"create_etcd_milvus_user",True)
-
+    if not etcd.create_etcd_user(data['milvus_etcd_username'], data['milvus_etcd_password'],
+                                 data['milvus_etcd_prefix'], readonly_keys=('health',)):
+        return False
     return create_seaweedfs_milvus_account(data)
 
 def delete_seaweedfs_milvus_account(data: dict):
@@ -194,7 +205,8 @@ def delete_milvus_accounts(data: dict):
     """"
     Deletes technical accounts for ETCD and SEAWEEDFS
     """
-    # currently we use the ETCD root password, so we skip the ETCD user deletion.
+    if not etcd.delete_db_user(data["milvus_etcd_username"]):
+        return False
     
     logging.info("removing milvus technical accounts.")
     return delete_seaweedfs_milvus_account(data)
@@ -206,6 +218,25 @@ def create_default_milvus_database(data):
     """
     logging.info("*** configuring MILVUS database for openserverless")
     adminClient = MilvusAdminClient()
+    # Security reconciliation must preserve an already provisioned system user.
+    # Authenticate with its configured credential; never reset it on an error.
+    from openserverless.milvus_simple_client import MilvusSimpleClient
+    import requests
+    try:
+        client = MilvusSimpleClient(uri=adminClient.milvus_url, token=adminClient.milvus_admin_token)
+        users = client.list_users()
+        if "openserverless" in users:
+            response = requests.post(adminClient.milvus_url + '/v2/vectordb/collections/list',
+                headers={'Authorization': 'Bearer openserverless:' + data['openserverless_password']},
+                json={'dbName': 'openserverless'}, timeout=10)
+            result = response.json()
+            if not response.ok or result.get('code') != 0 or 'data' not in result:
+                return False
+            _annotate_nuv_milvus_metadata(data)
+            return True
+    except (requests.RequestException, ValueError, TypeError):
+        logging.error('Could not verify the existing Milvus system account')
+        return False
     res = adminClient.setup_user("openserverless", data["openserverless_password"], "openserverless")
 
     if (res):

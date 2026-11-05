@@ -19,7 +19,7 @@
 
 {% if mode == 'create' %}
 -- Create schema only if not exists and owned by correct user
-CREATE SCHEMA IF NOT EXISTS {{username}}_schema;
-ALTER SCHEMA {{username}}_schema OWNER TO {{username}};
-ALTER DATABASE {{database}} SET search_path TO {{username}}_schema, pg_catalog;
+CREATE SCHEMA IF NOT EXISTS {{schema_identifier}};
+ALTER SCHEMA {{schema_identifier}} OWNER TO {{username_identifier}};
+ALTER DATABASE {{database_identifier}} SET search_path TO {{schema_identifier}}, pg_catalog;
 {% endif %}

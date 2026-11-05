@@ -83,98 +83,66 @@ class PostgresClient:
 
         return pg_dbsize_list
 
+    @staticmethod
+    def _identifier(value):
+        if not isinstance(value, str) or not value or "\x00" in value or len(value.encode("utf-8")) > 63:
+            raise ValueError("Invalid PostgreSQL identifier")
+        return '"' + value.replace('"', '""') + '"'
+
     def revoke_access_from_db(self, pg_username, pg_db_name):
-        """
-        Revoke all privileges on given database from the user and update it with SELECT only privileges.
-        This is done using postgres admin credentials to connect against the database to be capped
-        param: pg_username
-        param: pg_db_name database to revoke privileges from
+        """Suspend a quota-exceeded login, including its existing sessions.
+
+        Owners retain implicit DDL and grant authority. ACL-only read-only mode
+        cannot cap their writes. NOLOGIN plus session termination is required.
+        The role owns the same objects and retains its original ACLs for reset.
         """
         conn = None
         try:
+            role = self._identifier(pg_username)
             conn = self.get_connection_to_db(pg_db_name)
-            logging.info(f"Querying database {pg_db_name} existing schemas")
-
-            pg_user_schema_names = self._list_user_schemas(conn)
-
             cur = conn.cursor()
             try:
-                logging.info(f"executing REVOKE ALL PRIVILEGES ON DATABASE {pg_db_name} FROM {pg_username} and setting RO access")
-
-                cur.execute(f"REVOKE ALL PRIVILEGES ON DATABASE {pg_db_name} FROM {pg_username};")
-
-                for schema in pg_user_schema_names:
-                    logging.info(f"processing revocation on schema {schema}")
-
-                    # pg8000 uses the extended query protocol: one statement per execute()
-                    for statement in [
-                        f"REVOKE ALL ON ALL TABLES IN SCHEMA {schema} FROM {pg_username};",
-                        f"REVOKE ALL ON ALL SEQUENCES IN SCHEMA {schema} FROM {pg_username};",
-                        f"REVOKE ALL ON SCHEMA {schema} FROM {pg_username};",
-                        f"REVOKE ALL ON SCHEMA {schema} FROM public;",
-                        f"GRANT USAGE ON SCHEMA {schema} TO {pg_username};",
-                        f"GRANT SELECT ON ALL TABLES IN SCHEMA {schema} TO {pg_username};",
-                        f"GRANT SELECT ON ALL SEQUENCES IN SCHEMA {schema} TO {pg_username};",
-                        f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT ON TABLES TO {pg_username};",
-                        f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT ON SEQUENCES TO {pg_username};",
-                    ]:
-                        cur.execute(statement)
-
-                cur.execute(f"GRANT CONNECT ON DATABASE {pg_db_name} TO {pg_username};")
-
+                cur.execute(f"ALTER ROLE {role} NOLOGIN")
+                # Commit the login barrier before terminating any sessions;
+                # reconnecting must not race with an uncommitted role change.
                 conn.commit()
-                logging.info(f"user {pg_username} updated with RO access on {pg_db_name}")
+                cur.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                            "WHERE usesysid = (SELECT oid FROM pg_roles WHERE rolname = %s) "
+                            "AND pid <> pg_backend_pid()", (pg_username,))
+                if not all(row[0] for row in cur.fetchall()):
+                    raise RuntimeError("Could not terminate all tenant sessions")
+                conn.commit()
+                cur.execute("SELECT count(*) FROM pg_stat_activity "
+                            "WHERE usesysid = (SELECT oid FROM pg_roles WHERE rolname = %s) "
+                            "AND pid <> pg_backend_pid()", (pg_username,))
+                if cur.fetchone()[0]:
+                    raise RuntimeError("Tenant sessions remain active")
                 return True
             finally:
                 cur.close()
-        except Exception as ex:
-            logging.error(f"failed to set postgres user {pg_username} in R/O mode. Reason: {ex}")
+        except Exception:
+            logging.error("Could not suspend PostgreSQL tenant for quota")
             return False
         finally:
             if conn:
                 conn.close()
 
     def grant_access_on_db(self, pg_username, pg_db_name):
-        """
-        Grant all privileges on given database to the given and update it with ALL privileges.
-        This is done using postgres admin credentials to connect against the database to be capped
-        param: pg_username
-        param: pg_db_name database to grant privileges from
-        """
+        """Restore a suspended login without broadening its original grants."""
         conn = None
         try:
+            role = self._identifier(pg_username)
             conn = self.get_connection_to_db(pg_db_name)
-            logging.info(f"Querying database {pg_db_name} existing schemas")
-
-            pg_user_schema_names = self._list_user_schemas(conn)
-
             cur = conn.cursor()
             try:
-                logging.info(f"executing GRANT ALL PRIVILEGES ON DATABASE {pg_db_name} FROM {pg_username} and setting RO access")
-
-                cur.execute(f"GRANT ALL PRIVILEGES ON DATABASE {pg_db_name} TO {pg_username};")
-
-                for schema in pg_user_schema_names:
-                    logging.info(f"processing grant on schema {schema}")
-
-                    # pg8000 uses the extended query protocol: one statement per execute()
-                    for statement in [
-                        f"GRANT ALL ON ALL TABLES IN SCHEMA {schema} TO {pg_username};",
-                        f"GRANT ALL ON ALL SEQUENCES IN SCHEMA {schema} TO {pg_username};",
-                        f"GRANT ALL ON SCHEMA {schema} TO {pg_username};",
-                        f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT ALL ON TABLES TO {pg_username};",
-                        f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT ALL ON SEQUENCES TO {pg_username};",
-                    ]:
-                        cur.execute(statement)
-
+                cur.execute(f"ALTER ROLE {role} LOGIN")
                 conn.commit()
-                logging.info(f"user {pg_username} updated with FULL access on {pg_db_name}")
                 return True
             finally:
                 cur.close()
-        except Exception as ex:
-            logging.error(f"failed to set FULL ACCESS to postgres user {pg_username}. Reason: {ex}")
+        except Exception:
+            logging.error("Could not restore PostgreSQL tenant after quota")
             return False
         finally:
             if conn:
-                conn.close()                               
+                conn.close()

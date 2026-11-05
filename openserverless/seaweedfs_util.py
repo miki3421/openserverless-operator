@@ -86,7 +86,7 @@ class SeaweedfsClient:
             if e.response.status_code == 403:
                 raise SeaweedfsUnauthorizedException()
 
-    def _exec_weed_command(self,command):
+    def _exec_weed_command(self, command, missing_user=None):
         # weed shell also interprets semicolons as command separators.
         if not isinstance(command, str) or re.search(r"[\n\r;]", command):
             raise ValueError("invalid characters in weed shell command")
@@ -97,6 +97,12 @@ class SeaweedfsClient:
              "--", "weed", "shell"],
             input=command + "\n", text=True, capture_output=True, timeout=60,
         )
+        if missing_user is not None and result.returncode and re.search(
+            rf"(?im)^\s*error: rpc error: code = NotFound desc = user "
+            rf"{re.escape(missing_user)} not found\s*$",
+            result.stderr,
+        ):
+            return True
         # Older shells can report an error while returning exit status zero.
         if result.returncode or re.search(
             r"(?im)^\s*(?:error:|unknown command:|error reading stdin:)",
@@ -181,8 +187,15 @@ class SeaweedfsClient:
         """       
         return util.check(self._multipart_request(f"buckets/{bucket_name}/?public=0", method="PUT"),"make_private_bucket",True)
     
-    def delete_user(self, username):
+    def delete_user(self, username, missing_ok=False):
         """
         removes a user from seaweedfs
         """
-        return util.check(self._exec_weed_command(f"s3.configure -user={username} -delete -apply"),"delete_user",True)
+        return util.check(
+            self._exec_weed_command(
+                f"s3.configure -user={username} -delete -apply",
+                missing_user=username if missing_ok else None,
+            ),
+            "delete_user",
+            True,
+        )

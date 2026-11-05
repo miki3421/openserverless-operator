@@ -24,8 +24,11 @@ import openserverless.util as util
 import openserverless.openwhisk as openwhisk
 import openserverless.template as ntp
 import urllib.parse
+import base64
+import shlex
 import openserverless.operator_util as operator_util
 import openserverless.postgres_profile as postgres_profile
+from openserverless.postgres_credentials import apply_resources
 
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
@@ -52,7 +55,7 @@ def create(owner=None):
     util.wait_for_pod_ready("{.items[?(@.metadata.labels.control-plane == 'controller-manager')].metadata.name}")
     
     logging.info("*** creating a postgres instance")
-    data = util.get_postgres_config_data()    
+    data = util.get_postgres_config_data(create=True, owner=owner)
     mkust = kus.patchTemplates("postgres-operator-deploy",templates=["postgres.yaml"], data=data)
     mkust += kus.patchGenericEntry("Secret","postgres-openserverless-secret","/stringData/superUserPassword",data['postgres_root_password'])
     mkust += kus.patchGenericEntry("Secret","postgres-openserverless-secret","/stringData/replicationUserPassword",data['postgres_root_replica_password'])        
@@ -64,7 +67,7 @@ def create(owner=None):
     else:
         cfg.put("state.postgres.spec", mspec)
     
-    res += kube.apply(mspec)
+    res += apply_resources(mspec)
     # dynamically detect postgres pod and wait for readiness
     util.wait_for_pod_ready("{.items[?(@.metadata.labels.app == 'openserverless-postgres')].metadata.name}")
 
@@ -176,10 +179,32 @@ def render_postgres_script(namespace,template,data):
     """
     uses the given template to render a sh script to execute via psql.
     """
-    if not util.validate_namespace(namespace):
+    if not util.validate_database_name(namespace):
         raise ValueError(f"Invalid namespace {namespace}")
+    # Shared by native PostgreSQL and FerretDB provisioning. Never let SQL or
+    # psql metacommands be constructed from raw user credentials.
+    data = dict(data)
+    for key in ("username", "database"):
+        if key in data and not util.validate_database_name(data[key]):
+            raise ValueError("Invalid PostgreSQL identifier")
+        if key in data:
+            data[key + "_identifier"] = '"' + data[key].replace('"', '""') + '"'
+    if "username" in data and template in ("postgres_manage_user_schema_tpl.sql", "postgres_manage_user_extension_tpl.sql"):
+        schema = data["username"] + "_schema"
+        data["schema_identifier"] = '"' + schema + '"'
+    if "password" in data:
+        password = data["password"]
+        if not isinstance(password, str) or "\x00" in password:
+            raise ValueError("Invalid PostgreSQL password")
+        data["password_base64"] = base64.b64encode(password.encode("utf-8")).decode("ascii")
+    if "postgres_root_password" in data:
+        password = data["postgres_root_password"]
+        if any(c in password for c in "\x00\r\n"):
+            raise ValueError("Invalid PostgreSQL admin password")
+        data["pgpass_password"] = password.replace("\\", "\\\\").replace(":", "\\:")
     out = f"/tmp/__{namespace}_{template}"
     file = ntp.spool_template(template, out, data)
+    os.chmod(file, 0o600)
     return os.path.abspath(file)
 
 def exec_psql_command(pod_name,path_to_psql_script,path_to_pgpass,additional_psql_args=''):
@@ -190,7 +215,7 @@ def exec_psql_command(pod_name,path_to_psql_script,path_to_pgpass,additional_psq
     res = kube.kubectl("cp",path_to_pgpass,f"{pod_name}:/tmp/.pgpass")
     res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"chmod 600 /tmp/.pgpass")
 
-    cmd = f"PGPASSFILE='/tmp/.pgpass' psql --username postgres --dbname postgres {additional_psql_args} -f {path_to_psql_script}"
+    cmd = f"PGPASSFILE='/tmp/.pgpass' psql -X -v ON_ERROR_STOP=1 --username postgres --dbname postgres {additional_psql_args} -f {path_to_psql_script}"
     logging.info(f"executing command: {cmd}")
     res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",cmd)
     
@@ -336,7 +361,7 @@ def exec_psql_command_in_db(db_name,pod_name,path_to_psql_script,path_to_pgpass)
     res = kube.kubectl("cp",path_to_psql_script,f"{pod_name}:{path_to_psql_script}")
     res = kube.kubectl("cp",path_to_pgpass,f"{pod_name}:/tmp/.pgpass")
     res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"chmod 600 /tmp/.pgpass")
-    res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"PGPASSFILE='/tmp/.pgpass' psql --username postgres --dbname {db_name} -f {path_to_psql_script}")
+    res = kube.kubectl("exec","-it",pod_name,"--","/bin/bash","-c",f"PGPASSFILE='/tmp/.pgpass' psql -X -v ON_ERROR_STOP=1 --username postgres --dbname {shlex.quote(db_name)} -f {path_to_psql_script}")
     os.remove(path_to_psql_script)
     os.remove(path_to_pgpass)
     return res
