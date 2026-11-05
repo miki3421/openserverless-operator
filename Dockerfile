@@ -15,6 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+# Rebuild the four operator CLIs from pinned source/modules with patched Go.
+FROM golang:1.27.3-bookworm@sha256:b08bc99468058b6d8a0ada17fa54996b910d5e82a7e95bee0372e3bd98415258 AS operator-tools
+ENV GOTOOLCHAIN=local CGO_ENABLED=0
+COPY tools/go-tools /build/go-tools
+RUN /build/go-tools/build.sh /out
+
 #------------------------------------------------------------------------------
 # Sources
 FROM python:3.12-slim-bookworm AS sources
@@ -123,19 +129,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections && \
     apt-get update && apt-get install -y --no-install-recommends \
     curl zip unzip openssl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    # install kubectl
-    KVER="v1.23.0" && \
-    ARCH="$(dpkg --print-architecture)" && \
-    curl -sL "https://dl.k8s.io/release/$KVER/bin/linux/$ARCH/kubectl" -o /usr/bin/kubectl && chmod +x /usr/bin/kubectl && \
-    VER="v4.5.7" && \
-    curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$VER/kustomize_${VER}_linux_${ARCH}.tar.gz" | tar xzvf - -C /usr/bin && \
-    # openwhisk cli
-    WSK_VERSION=1.2.0 && \
-    WSK_BASE=https://github.com/apache/openwhisk-cli/releases/download && \
-    curl -sL "$WSK_BASE/$WSK_VERSION/OpenWhisk_CLI-$WSK_VERSION-linux-$ARCH.tgz" | tar xzvf - -C /usr/bin/ && \
-    # install taskfile
-    curl -sL https://taskfile.dev/install.sh | sh -s -- -d -b /usr/bin
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=operator-tools /out/ /usr/bin/
 
 USER openserverless
 WORKDIR /home/openserverless

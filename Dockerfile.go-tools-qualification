@@ -1,0 +1,6 @@
+# Local qualification using only outputs verified by tools/go-tools/build.sh.
+ARG BASE_IMAGE=localhost/ops-advanced-operator:20261105-r4
+FROM ${BASE_IMAGE}
+USER root
+COPY kubectl kustomize wsk task /usr/bin/
+USER openserverless

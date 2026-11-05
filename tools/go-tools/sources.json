@@ -1,0 +1,26 @@
+[
+  {
+    "Path": "sigs.k8s.io/kustomize/kustomize/v5",
+    "Version": "v5.8.3",
+    "Sum": "h1:SJXKgCEb4Ru+8PrhwQ+ORAASc2rPWBneHjh4fKTXPWY=",
+    "GoModSum": "h1:goZZjpeux35r4u4E3BPtetYBYcj6Vi5xQtpABCPF9Nk="
+  },
+  {
+    "Path": "github.com/go-task/task/v3",
+    "Version": "v3.54.0",
+    "Sum": "h1:xDgD9BNHIDnHhemB3gumYb+ozUoa6oCFMIz44GGosj8=",
+    "GoModSum": "h1:oOHzpL1r0bga9Xq1dC/8kucE1Y4fxSMTlKKFpNi6mFc="
+  },
+  {
+    "Path": "github.com/apache/openwhisk-cli",
+    "Version": "v0.0.0-20210326003826-7c47ef1dbad5",
+    "Sum": "h1:n+vlRWZxFVArds8OemiSnDs392VFApXhPMO563Q4gtM=",
+    "GoModSum": "h1:gWtJgsIx6n8yb3aUz6iRuSn8LiEZLbrmRJiE/DtQnFI="
+  },
+  {
+    "Path": "github.com/jteeuwen/go-bindata",
+    "Version": "v3.0.7+incompatible",
+    "Sum": "h1:91Uy4d9SYVr1kyTJ15wJsog+esAZZl7JmEfTkwmhJts=",
+    "GoModSum": "h1:JVvhzYOiGBnFSYRyV00iY8q7/0PThjIYav1p9h5dmKs="
+  }
+]
