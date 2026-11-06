@@ -1,0 +1,6 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 lab qualification; parent must be imported locally.
+FROM localhost/ops-advanced-operator:20261106-monitoring-r2@sha256:2489f67984623ab7c5b13a8f7b984d6f2c7bd1e2d23394716ce388c49858e4b7
+COPY --chown=1001:1001 deploy/registry/02-registry-sts.yaml /home/openserverless/deploy/registry/02-registry-sts.yaml
+COPY --chown=1001:1001 tools/registry/refresh_archive.py /tmp/refresh_registry_archive.py
+RUN python -B /tmp/refresh_registry_archive.py && rm /tmp/refresh_registry_archive.py

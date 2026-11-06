@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: registry
-          image: registry:3.0.0
+          image: localhost/ops-advanced-registry:3.1.2-20261106-r1
           ports:
             - containerPort: 5000
           env:

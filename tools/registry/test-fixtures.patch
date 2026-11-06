@@ -1,0 +1,88 @@
+--- a/registry/api/v2/routes_test.go
++++ b/registry/api/v2/routes_test.go
+@@ -250,22 +250,23 @@
+ 		}
+ 	})
+ 
+-	// Startup test server
++	// Register handlers before parallel requests start. Mutating shared
++	// mux routes from the subtests races with other requests and subtests.
++	for _, tc := range tests {
++		route := router.GetRoute(tc.RouteName)
++		if route == nil {
++			t.Fatalf("route for name %q not found", tc.RouteName)
++		}
++		route.Handler(testHandler)
++	}
+ 	server := httptest.NewServer(router)
++	t.Cleanup(server.Close)
+ 
+ 	for _, tc := range tests {
+ 		requestURI := strings.TrimSuffix(prefix, "/") + tc.RequestURI
+ 		t.Run("("+tc.RouteName+")"+requestURI, func(t *testing.T) {
+ 			t.Parallel()
+ 			tc.RequestURI = requestURI
+-			// Register the endpoint
+-			route := router.GetRoute(tc.RouteName)
+-			if route == nil {
+-				t.Fatalf("route for name %q not found", tc.RouteName)
+-			}
+-
+-			route.Handler(testHandler)
+-
+ 			u := server.URL + tc.RequestURI
+ 
+ 			resp, err := http.Get(u)
+--- a/health/checks/checks_test.go
++++ b/health/checks/checks_test.go
+@@ -2,7 +2,10 @@
+ 
+ import (
+ 	"context"
++	"net/http"
++	"net/http/httptest"
+ 	"testing"
++	"time"
+ )
+ 
+ func TestFileChecker(t *testing.T) {
+@@ -16,11 +19,18 @@
+ }
+ 
+ func TestHTTPChecker(t *testing.T) {
+-	if err := HTTPChecker("https://www.google.cybertron", 200, 0, nil).Check(context.Background()); err == nil {
+-		t.Errorf("Google on Cybertron was expected as not exists")
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Method != http.MethodHead {
++			t.Errorf("expected HEAD, received %s", r.Method)
++		}
++		w.WriteHeader(http.StatusOK)
++	}))
++	t.Cleanup(server.Close)
++	if err := HTTPChecker(server.URL, http.StatusOK, time.Second, nil).Check(context.Background()); err != nil {
++		t.Errorf("local fixture should be healthy: %v", err)
+ 	}
+-
+-	if err := HTTPChecker("https://www.google.pt", 200, 0, nil).Check(context.Background()); err != nil {
+-		t.Errorf("Google at Portugal was expected as exists, error:%v", err)
++	server.Close()
++	if err := HTTPChecker(server.URL, http.StatusOK, time.Second, nil).Check(context.Background()); err == nil {
++		t.Error("closed local fixture should fail")
+ 	}
+ }
+--- a/registry/handlers/api_test.go
++++ b/registry/handlers/api_test.go
+@@ -2569,6 +2569,13 @@
+ }
+ 
+ func doPushChunk(t *testing.T, uploadURLBase string, body io.Reader, options chunkOptions) (*http.Response, error) {
++	// A rejected request may return while the transport still reads its body.
++	// Each request owns its cursor; the immutable byte storage may be shared.
++	if reader, ok := body.(*bytes.Reader); ok {
++		owned := *reader
++		body = &owned
++	}
++
+ 	u, err := url.Parse(uploadURLBase)
+ 	if err != nil {
+ 		t.Fatalf("unexpected error parsing pushLayer url: %v", err)
