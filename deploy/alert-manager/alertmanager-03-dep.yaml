@@ -58,12 +58,12 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
-        image: quay.io/prometheus/alertmanager:v0.25.0
+        image: localhost/ops-advanced-alertmanager:0.34.2-20261106-r1@sha256:899999e4ef1aced4e2fcd287065b8ae6bcf7488ed9d715f6c8b6845743ca3058
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            path: /
+            path: /-/healthy
             port: http
             scheme: HTTP
           initialDelaySeconds: 60
@@ -78,7 +78,7 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /
+            path: /-/ready
             port: http
             scheme: HTTP
           periodSeconds: 10

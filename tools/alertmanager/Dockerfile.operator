@@ -1,0 +1,8 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Fresh-install AMD64 qualification; existing notification state is guarded.
+FROM localhost/ops-advanced-operator:20261106-prometheus-r3@sha256:bd38ec8d812ff8c0c38bc0bfa5e3286005ac1faf7ba9ebee0fbef0ff9bf475df
+COPY --chown=1001:1001 openserverless/monitoring.py openserverless/alertmanager_profile.py /home/openserverless/openserverless/
+COPY --chown=1001:1001 openserverless/files/alertmanager-profile.json /home/openserverless/openserverless/files/
+COPY --chown=1001:1001 deploy/alert-manager/alertmanager-03-dep.yaml /home/openserverless/deploy/alert-manager/alertmanager-03-dep.yaml
+COPY --chown=1001:1001 tools/alertmanager/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py

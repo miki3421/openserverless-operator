@@ -28,6 +28,7 @@ import openserverless.config as cfg
 import openserverless.enterprise_util as ent_util
 import openserverless.util as util
 import openserverless.prometheus_profile as prometheus_profile
+import openserverless.alertmanager_profile as alertmanager_profile
 import logging
 
 def reconcile(owner):
@@ -84,6 +85,7 @@ def create(owner=None):
     alert_manager = cfg.get("monitoring.alert-manager.enabled") or False
 
     if alert_manager:        
+        alertmanager_profile.preflight(kube.kubectl)
         logging.info("*** enabling prometheus alert-manager")
         data = ent_util.get_am_config_data()
         kus.renderTemplate("alert-manager","pvc-create.yaml",data,"alertmanager-01-pvc_generated.yaml")

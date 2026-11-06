@@ -1,0 +1,8 @@
+{
+  "expected_version": "0.34.2-adv.1",
+  "image": "localhost/ops-advanced-alertmanager:0.34.2-20261106-r1@sha256:899999e4ef1aced4e2fcd287065b8ae6bcf7488ed9d715f6c8b6845743ca3058",
+  "deployment": "openserverless-prometheus-alertmanager",
+  "claim": "storage-openserverless-prometheus-alertmanager",
+  "volume": "storage-volume",
+  "volume_mount": "/alertmanager"
+}
