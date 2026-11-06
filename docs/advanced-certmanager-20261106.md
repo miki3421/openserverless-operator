@@ -64,6 +64,8 @@ changed from 14 Critical, 197 High, 230 Medium, 19 Low and 26 Unknown findings t
 remaining rated findings are in controller dependency `go-jose/v4` 4.1.4:
 CVE-2026-116585, CVE-2026-116586 and CVE-2026-116587. They are not suppressed or
 claimed fixed. Scanner matches are not proof of exploitable deployment paths.
+The subsequent [go-jose source and binary assessment](advanced-certmanager-jose-20261106.md)
+records why these three paths are not reachable in this exact AMD64 controller.
 
 External ACME issuance, DNS-provider credentials, existing certificate migration,
 ARM64, production HA and independent review remain unqualified. The old private
