@@ -143,6 +143,7 @@ def main():
         exchange(True, 'initial')
         identity()
         k('delete', 'pod', 'registry-0', '-n', ns, '--wait=true', '--timeout=60s')
+        k('wait', '--for=create', 'pod/registry-0', '-n', ns, '--timeout=60s')
         k('wait', '--for=condition=Ready', 'pod/registry-0', '-n', ns, '--timeout=180s')
         after = get('pod', 'registry-0', '-n', ns)
         check(before['metadata']['uid'] != after['metadata']['uid'], 'pod_recreated')
