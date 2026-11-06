@@ -1,0 +1,14 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Isolated 4.x candidate only: not a drop-in replacement for the ADV 3.x service.
+FROM apache/tika:4.2.0-1-full@sha256:4774eaac44f86cdf648ae7b5a367016eaf6f9052adec31e5cff07cff1a0c6e24
+USER 0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends --only-upgrade \
+      apt=3.2.1ubuntu0.1 libapt-pkg7.0=3.2.1ubuntu0.1 \
+ && echo '5e33a1304f207bb275b1b4cc3dc4c05fdd88755f5c705e2fd569924ec72dc061  /usr/bin/pebble' | sha256sum -c - \
+ && rm /usr/bin/pebble \
+ && rm -rf /var/lib/apt/lists/*
+# The inherited entrypoint starts Java directly. Preserve all Tika jars and OCR.
+USER 35002:35002
+LABEL org.opencontainers.image.version="4.2.0-adv.study.1" \
+      org.opencontainers.image.source="https://github.com/apache/tika"
