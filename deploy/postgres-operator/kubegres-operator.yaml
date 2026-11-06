@@ -88,7 +88,7 @@ spec:
         - --upstream=http://127.0.0.1:8080/
         - --logtostderr=true
         - --v=0
-        image: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.14.1
+        image: quay.io/brancz/kube-rbac-proxy:v0.23.1@sha256:bb7c6fbfbb00cc2892e97fd102b8f01eb19eef09ce216385a7cf68ea7a9e7fac
         name: kube-rbac-proxy
         ports:
         - containerPort: 8443

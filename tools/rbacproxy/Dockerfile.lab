@@ -1,0 +1,6 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 qualification; normal Dockerfile packages the deploy tree.
+FROM localhost/ops-advanced-operator:20261106-static-r1
+COPY --chown=1001:1001 deploy/postgres-operator/kubegres-operator.yaml /home/openserverless/deploy/postgres-operator/kubegres-operator.yaml
+COPY --chown=1001:1001 tools/rbacproxy/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py
