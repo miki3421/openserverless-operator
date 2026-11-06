@@ -15,50 +15,61 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-import kopf, logging, json
-import openserverless.kube as kube
-import openserverless.kustomize as kus
-import openserverless.config as cfg
+import hashlib
+import json
+import logging
 import time
+from pathlib import Path
+import openserverless.kube as kube
+import openserverless.config as cfg
 
-def get_cm_pod_name(runtime, jpath, namespace="cert-manager"):
-    # pod_name is retuned as a string array
-    pod_name = kube.kubectl("get", "pods", namespace=namespace, jsonpath=jpath)
-    if pod_name:
-        return pod_name[0]
-    
-    return None
 
-def wait_for_cm_ready(runtime, jpath, namespace="cert-manager"):
-    pod_name = get_cm_pod_name(runtime, jpath, namespace)
+def absent(kind, *names, namespace=None):
+    # Authentication, transport and API errors must not be mistaken for absence.
+    return not kube.kubectl("get", kind, *names, "--ignore-not-found", "-o", "name",
+                            namespace=namespace, timeout=60).strip()
 
-    if pod_name:
-        logging.info(f"checking for {pod_name}")
-        while not kube.wait(f"pod/{pod_name}", "condition=ready",namespace=namespace):
-            logging.info(f"waiting for {pod_name} to be ready...")
-            time.sleep(1)
-    else:
-        logging.error("*** could not determine if cert-manager webhook pod is up and running")
+
+def wait_for_admission(timeout=300):
+    deadline = time.monotonic() + timeout
+    probe = {"apiVersion": "cert-manager.io/v1", "kind": "Issuer",
+             "metadata": {"generateName": "ops-admission-probe-", "namespace": "cert-manager"},
+             "spec": {"selfSigned": {}}}
+    while True:
+        try:
+            return kube.kubectl("create", "--dry-run=server", "--request-timeout=10s",
+                                "-f", "-", "-o", "name", namespace=None,
+                                input=json.dumps(probe), timeout=15)
+        except Exception as error:
+            if time.monotonic() >= deadline:
+                raise RuntimeError("cert-manager admission is not ready") from error
+            time.sleep(2)
 
 def create(owner=None):
-    logging.info(f"*** Configuring certificate manager")
-    runtime = cfg.get('openserverless.kube')
-
-    cm = kube.get("service/cert-manager","cert-manager")
-    if cm:
+    logging.info("*** Configuring certificate manager")
+    if not absent("service", "cert-manager", namespace="cert-manager"):
+        # Preserve externally installed certificate managers, including older versions.
         return "certificate manager is already installed...skipping setup"
-    else:
-        # we apply the cert-manager.yaml as is
-        spec = "deploy/cert-manager/cert-manager.yaml"
-        cfg.put("state.cm.spec", spec)       
-        res = kube.kubectl("apply", "-f", spec, namespace=None)
-
-        # ensure the cert-manager pods are running    
-        wait_for_cm_ready(runtime, r"{.items[?(@.metadata.labels.app\.kubernetes\.io\/component == 'controller')].metadata.name}")
-        wait_for_cm_ready(runtime, r"{.items[?(@.metadata.labels.app\.kubernetes\.io\/component == 'cainjector')].metadata.name}")
-        wait_for_cm_ready(runtime, r"{.items[?(@.metadata.labels.app\.kubernetes\.io\/component == 'webhook')].metadata.name}")
-
-        return res
+    crds = ("certificates.cert-manager.io", "certificaterequests.cert-manager.io",
+            "issuers.cert-manager.io", "clusterissuers.cert-manager.io",
+            "orders.acme.cert-manager.io", "challenges.acme.cert-manager.io")
+    if not absent("namespace", "cert-manager") or not absent("crd", *crds):
+        raise RuntimeError("Incomplete cert-manager installation requires reviewed recovery; refusing overwrite")
+    version = json.loads(kube.kubectl("version", "-o", "json", namespace=None, timeout=60))["serverVersion"]
+    if version["major"] != "1" or version["minor"].rstrip("+") not in ("33", "34", "35", "36"):
+        raise RuntimeError("This cert-manager candidate supports Kubernetes 1.33–1.36")
+    spec = "deploy/cert-manager/cert-manager.yaml"
+    release = json.loads(Path("deploy/cert-manager/release.json").read_text())
+    if hashlib.sha256(Path(spec).read_bytes()).hexdigest() != release["manifestSha256"]:
+        raise RuntimeError("cert-manager manifest integrity mismatch")
+    res = kube.kubectl("apply", "--server-side", "--field-manager=ops-cert-manager",
+                       "-f", spec, namespace=None, timeout=180)
+    cfg.put("state.cm.spec", spec)
+    for name in ("cert-manager", "cert-manager-cainjector", "cert-manager-webhook"):
+        kube.kubectl("rollout", "status", f"deployment/{name}", "--timeout=300s",
+                     namespace="cert-manager", timeout=330)
+    wait_for_admission()
+    return res
 
 def delete():
     spec = cfg.get("state.cm.spec")

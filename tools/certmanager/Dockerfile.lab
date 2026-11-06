@@ -1,0 +1,7 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 qualification; normal Dockerfile packages the deploy tree.
+FROM localhost/ops-advanced-operator:20261106-rbacproxy-r1
+COPY --chown=1001:1001 openserverless/certmanager.py /home/openserverless/openserverless/certmanager.py
+COPY --chown=1001:1001 deploy/cert-manager/ /home/openserverless/deploy/cert-manager/
+COPY --chown=1001:1001 tools/certmanager/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py
