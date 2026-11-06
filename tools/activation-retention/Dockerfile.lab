@@ -1,0 +1,9 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 lab qualification; the normal Dockerfile remains canonical
+# for a full source build. Verify the base manifest before invoking this recipe.
+FROM localhost/ops-advanced-operator:20261105-r5
+COPY --chown=1001:1001 openserverless/activation_cleanup.py openserverless/activation_retention.py openserverless/couchdb.py openserverless/main.py /home/openserverless/openserverless/
+COPY --chown=1001:1001 deploy/openserverless-permissions/whisk-crd.yaml /home/openserverless/deploy/openserverless-permissions/whisk-crd.yaml
+COPY --chown=1001:1001 deploy/openserverless-operator/whisk.yaml /home/openserverless/deploy/openserverless-operator/whisk.yaml
+COPY --chown=1001:1001 tools/activation-retention/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py

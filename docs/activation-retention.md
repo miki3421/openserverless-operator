@@ -85,6 +85,44 @@ CronJob was accepted by ADV K3s with server-side dry-run only. No retention job
 was installed or executed on ADV or baseline. This does not qualify automatic
 scheduling, a release image, or other CPU architectures.
 
+## Subsequent ADV qualification
+
+The operator was then qualified and installed on the authorized AMD64 ADV K3s
+lab. Image `localhost/ops-advanced-operator:20261106-retention-r1` has manifest
+`sha256:8ed6aa73e13cfb305b1cde0052f27dfc06574873f4316ceb7e65a3acaf305db4`
+and configuration
+`sha256:517e4d3658dfd6cf9b51212b83b885c7a7fa9ccb6c3c95aece64784e562ac4e5`.
+The incremental lab recipe is `tools/activation-retention/Dockerfile.lab`, based
+on the previously qualified r5 manifest
+`sha256:b3a3684e2b38e0661be47c3bab02d865ae4b9f99585b3c69d5e6b155b20b0200`.
+Check that exact base before building. The normal Dockerfile includes the new
+modules and manifests for full builds; a fresh full image build is a separate
+qualification. No image was published to a registry by this batch.
+
+The candidate retains all base layers. Comparison of 197 source/tool/archive
+members found only the expected four Python additions/changes and two deployment
+manifest changes. The four previously refreshed Go binaries remain identical.
+All 17 focused tests pass against the packaged candidate modules.
+
+`tests/activation_retention_cluster.py` uses an owned, temporary namespace with
+memory-backed CouchDB and isolated networking. A real CronJob dispatch deleted
+410 expired records; recent records and other databases survived. Repeating its
+Job template deleted zero. For this bounded test only, the schedule was every
+minute; the deployed system policy remains daily at 03:17 UTC. The test namespace
+was removed by verified UID. An initial fixture string syntax error occurred
+before seeding; its evidence was retained, and the corrected fixture now compiles
+its embedded script before creating resources.
+
+The actual ADV database preview found zero records older than 30 days among
+8,569 live documents. An operator-only rollout first created a suspended job for
+the unchanged legacy Whisk, proving that rollout alone did not enable deletion.
+After explicitly setting 30 days, the generated job was enabled, and a one-off
+run completed with zero deletions. The policy survived another operator restart.
+Alpha/Beta application, persistence and API authorization checks passed 12/12.
+The baseline was not contacted or modified. Dependencies, broad suite failures,
+ARM64 and production qualification retain their earlier limits; no whole-suite
+or whole-platform security acceptance is claimed.
+
 References: [Kubernetes CronJobs](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/),
 [CouchDB bulk deletion](https://docs.couchdb.org/en/stable/api/database/bulk-api.html),
 [CouchDB compaction](https://docs.couchdb.org/en/stable/maintenance/compaction.html).
