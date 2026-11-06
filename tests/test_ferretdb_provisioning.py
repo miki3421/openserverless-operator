@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pathlib
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 from openserverless import ferretdb
@@ -25,8 +27,18 @@ class FerretProvisioningTests(unittest.TestCase):
         user = Mock()
         user.get.side_effect = {"namespace": "opsvalalpha", "mongodb.database": "opsvalalpha",
                                 "mongodb.password": "synthetic"}.get
-        with patch.object(ferretdb.util, "get_postgres_config_data", return_value={}), \
-             patch.object(ferretdb.postgres.ntp, "spool_template", return_value="/tmp/synthetic.sql") as render, \
+        with tempfile.TemporaryDirectory() as directory:
+            def spool(template, name, data):
+                # The real wrapper chmods the rendered file. Supply a real,
+                # owned fixture instead of a nonexistent shared /tmp path.
+                path = pathlib.Path(directory) / pathlib.Path(name).name
+                path.write_text("synthetic fixture\n")
+                return str(path)
+            self.check_provisioning(user, spool)
+
+    def check_provisioning(self, user, spool):
+        with patch.object(ferretdb.util, "get_postgres_config_data", side_effect=lambda: {}), \
+             patch.object(ferretdb.postgres.ntp, "spool_template", side_effect=spool) as render, \
              patch.object(ferretdb.util, "get_pod_name_by_selector", return_value="primary-0") as select, \
              patch.object(ferretdb.postgres, "exec_psql_command", return_value="OK") as execute, \
              patch.object(ferretdb, "_add_mdb_user_metadata"):
@@ -41,6 +53,10 @@ class FerretProvisioningTests(unittest.TestCase):
             self.assertEqual(invocation.args[2]["database"], "opsvalalpha_ferretdb")
             self.assertEqual(invocation.args[2]["username"], "opsvalalpha_ferretdb")
         self.assertTrue(all(invocation.args[0] == "primary-0" for invocation in execute.call_args_list))
+        self.assertEqual(execute.call_count, 2)
+        for invocation in execute.call_args_list:
+            for path in invocation.args[1:]:
+                self.assertEqual(pathlib.Path(path).stat().st_mode & 0o777, 0o600)
 
 
 if __name__ == "__main__":

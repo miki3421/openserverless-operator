@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import base64
 import copy
 import json
 import unittest
@@ -23,7 +24,7 @@ import tempfile
 import subprocess
 import sys
 import os
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import yaml
 from openserverless import milvus_standalone as milvus
@@ -38,24 +39,49 @@ class MilvusStorageTest(unittest.TestCase):
                 'volumes': [{'persistentVolumeClaim': {'claimName': 'openserverless-milvus'}}]}}}}
         self.cm = {'kind': 'ConfigMap', 'metadata': {'name': 'openserverless-milvus'},
                    'data': {'default.yaml': yaml.safe_dump(config)}}
-        self.spec = {'items': [self.deployment, self.cm]}
+        self.secret = {'kind': 'Secret', 'metadata': {'name': 'openserverless-milvus'},
+                       'stringData': copy.deepcopy(self.cm['data'])}
+        self.spec = {'items': [self.deployment, self.secret]}
+
+    def stored_secret(self, config=None):
+        value = config or self.cm
+        return json.dumps({'kind': 'Secret', 'metadata': value['metadata'],
+                           'data': {k: base64.b64encode(v.encode()).decode()
+                                    for k, v in value['data'].items()}})
 
     @patch.object(milvus.kube, 'kubectl')
     def test_fresh_install(self, command):
         command.return_value = ''
         milvus._check_storage_compatibility(self.spec)
-        self.assertEqual(command.call_count, 3)
+        self.assertEqual(command.call_args_list, [
+            call('get', 'deployment', 'openserverless-milvus-standalone', '--ignore-not-found', '-o', 'json'),
+            call('get', 'secret', 'openserverless-milvus', '--ignore-not-found', '-o', 'json', debugresult=False),
+            call('get', 'configmap', 'openserverless-milvus', '--ignore-not-found', '-o', 'json', debugresult=False),
+            call('get', 'pvc', 'openserverless-milvus', '--ignore-not-found', '-o', 'json'),
+        ])
 
     @patch.object(milvus.kube, 'kubectl')
     def test_same_install_can_be_reconciled(self, command):
-        command.side_effect = [json.dumps(self.deployment), json.dumps(self.cm)]
+        command.side_effect = [json.dumps(self.deployment), self.stored_secret()]
         milvus._check_storage_compatibility(self.spec)
+
+    @patch.object(milvus.kube, 'kubectl')
+    def test_legacy_configmap_can_be_reconciled(self, command):
+        command.side_effect = [json.dumps(self.deployment), '', json.dumps(self.cm)]
+        milvus._check_storage_compatibility(self.spec)
+        self.assertEqual(command.call_count, 3)
+
+    @patch.object(milvus.kube, 'kubectl')
+    def test_missing_config_refused(self, command):
+        command.side_effect = [json.dumps(self.deployment), '', '']
+        with self.assertRaisesRegex(RuntimeError, 'has no configuration'):
+            milvus._check_storage_compatibility(self.spec)
 
     @patch.object(milvus.kube, 'kubectl')
     def test_engine_upgrade_refused(self, command):
         old = copy.deepcopy(self.deployment)
         old['spec']['template']['spec']['containers'][0]['image'] = 'milvus:v2.5.2'
-        command.side_effect = [json.dumps(old), json.dumps(self.cm)]
+        command.side_effect = [json.dumps(old), self.stored_secret()]
         with self.assertRaisesRegex(RuntimeError, 'image differs'):
             milvus._check_storage_compatibility(self.spec)
 
@@ -68,13 +94,15 @@ class MilvusStorageTest(unittest.TestCase):
             config = yaml.safe_load(old['data']['default.yaml'])
             config[section][key] = value
             old['data']['default.yaml'] = yaml.safe_dump(config)
-            command.side_effect = [json.dumps(self.deployment), json.dumps(old)]
-            with self.assertRaisesRegex(RuntimeError, 'storage or WAL differs'):
-                milvus._check_storage_compatibility(self.spec)
+            for stored in [self.stored_secret(old), '']:
+                with self.subTest(section=section, key=key, secret=bool(stored)):
+                    command.side_effect = [json.dumps(self.deployment), stored, json.dumps(old)]
+                    with self.assertRaisesRegex(RuntimeError, 'storage or WAL differs'):
+                        milvus._check_storage_compatibility(self.spec)
 
     @patch.object(milvus.kube, 'kubectl')
     def test_orphaned_persistent_state_refused(self, command):
-        for output in [('', json.dumps(self.cm)), ('', '', '{}')]:
+        for output in [('', self.stored_secret()), ('', '', json.dumps(self.cm)), ('', '', '', '{}')]:
             command.side_effect = output
             with self.assertRaisesRegex(RuntimeError, 'implicit .* reuse is disabled'):
                 milvus._check_storage_compatibility(self.spec)
@@ -85,7 +113,7 @@ class MilvusStorageTest(unittest.TestCase):
         config = yaml.safe_load(old['data']['default.yaml'])
         config['woodpecker'] = {'storage': {'type': 'minio'}}
         old['data']['default.yaml'] = yaml.safe_dump(config)
-        command.side_effect = [json.dumps(self.deployment), json.dumps(old)]
+        command.side_effect = [json.dumps(self.deployment), self.stored_secret(old)]
         with self.assertRaisesRegex(RuntimeError, 'storage or WAL differs'):
             milvus._check_storage_compatibility(self.spec)
 
@@ -93,7 +121,7 @@ class MilvusStorageTest(unittest.TestCase):
     def test_volume_change_refused(self, command):
         old = copy.deepcopy(self.deployment)
         old['spec']['template']['spec']['volumes'][0]['persistentVolumeClaim']['claimName'] = 'old-volume'
-        command.side_effect = [json.dumps(old), json.dumps(self.cm)]
+        command.side_effect = [json.dumps(old), self.stored_secret()]
         with self.assertRaisesRegex(RuntimeError, 'volume differs'):
             milvus._check_storage_compatibility(self.spec)
 
@@ -130,8 +158,10 @@ class MilvusRenderTest(unittest.TestCase):
             self.assertEqual(tls['secret']['secretName'],'openserverless-etcd-client-tls-v37')
             self.assertEqual(tls['secret']['defaultMode'],0o440)
             self.assertNotIn('emptyDir', next(v for v in pod['volumes'] if v['name'] == 'milvus-data-disk'))
-            cm = next(item for item in spec['items'] if item['kind'] == 'ConfigMap')
-            config = yaml.safe_load(cm['data']['default.yaml'])
+            self.assertFalse(any(item['kind'] == 'ConfigMap' for item in spec['items']))
+            cm = next(item for item in spec['items'] if item['kind'] == 'Secret'
+                      and item['metadata']['name'] == 'openserverless-milvus')
+            config = yaml.safe_load(cm['stringData']['default.yaml'])
             self.assertEqual(config['mq']['type'], 'woodpecker')
             self.assertEqual(config['woodpecker']['storage']['type'], 'local')
             self.assertEqual(config['woodpecker']['logstore']['segmentSyncPolicy']['maxIntervalForLocalStorage'], '1ms')
@@ -140,7 +170,7 @@ class MilvusRenderTest(unittest.TestCase):
             self.assertEqual(config['etcd']['rootPath'], 'milvus-etcd-v37')
             self.assertTrue(config['etcd']['ssl']['enabled'])
             self.assertEqual(len(config['etcd']['endpoints']), 3)
-            user = yaml.safe_load(cm['data']['user.yaml'])
+            user = yaml.safe_load(cm['stringData']['user.yaml'])
             self.assertTrue(user['common']['security']['authorizationEnabled'])
             self.assertEqual(user['common']['gracefulTime'], 0)
             service = next(item for item in spec['items'] if item['kind'] == 'Service')
