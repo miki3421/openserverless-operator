@@ -23,6 +23,7 @@ import openserverless.config as cfg
 import openserverless.couchdb_util
 import openserverless.util as util
 import openserverless.couchdb_profile as couchdb_profile
+import openserverless.activation_retention as activation_retention
 
 from openserverless.user_config import UserConfig
 from openserverless.user_metadata import UserMetadata
@@ -61,6 +62,7 @@ def create(owner=None):
     u = cfg.get('couchdb.admin.user', "COUCHDB_ADMIN_USER", "whisk_admin")
     p = cfg.get('couchdb.admin.password', "COUCHDB_ADMIN_PASSWORD")
     init_config = initialization_config()
+    retention_resources = activation_retention.resources()
     user = f"db_username={u}"
     pasw = f"db_password={p}"
 
@@ -109,6 +111,7 @@ def create(owner=None):
         'metadata': {'name': 'couchdb-init-config', 'namespace': 'openserverless'},
         'type': 'Opaque', 'stringData': {'config': json.dumps(init_config)},
     })
+    spec['items'].extend(retention_resources)
     if owner:
         kopf.append_owner_reference(spec['items'], owner)
     else:

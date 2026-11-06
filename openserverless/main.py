@@ -22,6 +22,7 @@ import openserverless.config as cfg
 import openserverless.kube as kube
 import openserverless.redis as redis
 import openserverless.couchdb as couchdb
+import openserverless.activation_retention as activation_retention
 import openserverless.openwhisk as openwhisk
 import openserverless.cronjob as cron
 import openserverless.mongodb_native as ferretdb
@@ -403,11 +404,13 @@ def whisk_update(spec, status, namespace, diff, name, **kwargs):
     messaging_security.reconcile(owner)
     monitoring.reconcile(owner)
     seaweedfs.reconcile(owner)
+    activation_retention.reconcile(owner)
     patcher.patch(diff, status, owner, name)
 
 @kopf.on.resume('openserverless.org', 'v1', 'whisks')
 def whisk_resume(spec, status, name, **kwargs):   
     operator_util.config_from_spec(spec, handler_type="on_resume")
+    activation_retention.reconcile(kube.get(f"wsk/{name}"))
     if cfg.get('components.zookeeper') or cfg.get('components.kafka'):
         messaging_security.reconcile(kube.get(f"wsk/{name}"))
     if cfg.get('components.monitoring'):

@@ -43,6 +43,7 @@ spec:
       openserverless: cbd68075-dac2-475e-8c07-d62a30c7e683:123zO3xZCLrMN6v2BKK1dXYFpXlPkccOFqm12CdAsMgRU4VrNZ9lyGVCGuMDGIwP
   couchdb:
     host: couchdb
+    activation-retention-days: 30
     volume-size: 10
     admin:
       user: whisk_admin
