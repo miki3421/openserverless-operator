@@ -1,0 +1,7 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Existing ADV compatibility image: replace only the stateless KSM manifest.
+# Keep that installation's Prometheus/Alertmanager versions and stored data.
+FROM localhost/ops-advanced-operator:20261106-registry-r1@sha256:ce213f0ac64b5da1c7ba36631c1a4aae98df4af8804c30e217aa1b8ec443c09f
+COPY --chown=1001:1001 deploy/monitoring/kubestate-03-dep.yaml /home/openserverless/deploy/monitoring/kubestate-03-dep.yaml
+COPY --chown=1001:1001 tools/monitoring/refresh_ksm_archive.py /tmp/refresh_ksm_archive.py
+RUN python -B /tmp/refresh_ksm_archive.py && rm /tmp/refresh_ksm_archive.py

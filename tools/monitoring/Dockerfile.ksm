@@ -3,5 +3,5 @@
 FROM registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0@sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b
 COPY --chown=65534:65534 kube-state-metrics /kube-state-metrics
 LABEL org.opencontainers.image.source="https://github.com/kubernetes/kube-state-metrics" \
-      org.opencontainers.image.revision="4ffeda2ef866b0fef372849825a803296483b336+bc457a62" \
-      org.opencontainers.image.version="2.20.0-adv.1"
+      org.opencontainers.image.revision="4ffeda2ef866b0fef372849825a803296483b336+bc457a62-xnet062" \
+      org.opencontainers.image.version="2.20.0-adv.2"

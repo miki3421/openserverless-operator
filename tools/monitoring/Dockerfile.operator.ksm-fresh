@@ -1,0 +1,6 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Fresh-install candidate includes qualified Prometheus/Alertmanager guards.
+FROM localhost/ops-advanced-operator:20261106-alertmanager-r1@sha256:b6c8145b4ac504fe170bd8e121ad89241284de60eb49d1eee51866b6b82e968a
+COPY --chown=1001:1001 deploy/monitoring/kubestate-03-dep.yaml /home/openserverless/deploy/monitoring/kubestate-03-dep.yaml
+COPY --chown=1001:1001 tools/monitoring/refresh_ksm_archive.py /tmp/refresh_ksm_archive.py
+RUN python -B /tmp/refresh_ksm_archive.py && rm /tmp/refresh_ksm_archive.py
