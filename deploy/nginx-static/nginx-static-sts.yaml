@@ -39,7 +39,7 @@ spec:
         command: ['sh', '-c', "until nslookup seaweedfs.$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace).svc.cluster.local; do echo waiting for seaweedfs; sleep 2; done"]
       containers:
       - name: openserverless-static
-        image: nginxinc/nginx-unprivileged:1.24
+        image: docker.io/nginx/nginx-unprivileged:1.30.6@sha256:e17bfe33eecc8fd86ca9f12c665f21270b0d88b09a0f13bfdede3fcd795f5fda
         ports:
         - containerPort: 8080
         volumeMounts:

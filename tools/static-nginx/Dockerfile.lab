@@ -1,0 +1,6 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 lab build. Normal Dockerfile consumes the canonical deploy tree.
+FROM localhost/ops-advanced-operator:20261106-retention-r1
+COPY --chown=1001:1001 deploy/nginx-static/nginx-static-sts.yaml /home/openserverless/deploy/nginx-static/nginx-static-sts.yaml
+COPY --chown=1001:1001 tools/static-nginx/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py
