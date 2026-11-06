@@ -1,0 +1,8 @@
+{
+  "expected_version": "3.16.0-adv.1",
+  "image": "localhost/ops-advanced-prometheus:3.16.0-20261106-r1@sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b",
+  "deployment": "openserverless-prometheus-server",
+  "claim": "openserverless-prometheus-server-pvc",
+  "volume": "storage-volume",
+  "volume_mount": "/data"
+}

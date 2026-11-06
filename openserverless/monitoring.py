@@ -27,6 +27,7 @@ import openserverless.kustomize as kus
 import openserverless.config as cfg
 import openserverless.enterprise_util as ent_util
 import openserverless.util as util
+import openserverless.prometheus_profile as prometheus_profile
 import logging
 
 def reconcile(owner):
@@ -78,6 +79,8 @@ def create(owner=None):
     Configuring the operator monitoring via prometheus.
     """
     logging.info("*** creating prometheus based monitoring")
+    # Check before Alertmanager, templates or persisted specs can be changed.
+    prometheus_profile.preflight(kube.kubectl)
     alert_manager = cfg.get("monitoring.alert-manager.enabled") or False
 
     if alert_manager:        

@@ -53,11 +53,9 @@ spec:
         - --storage.tsdb.retention.time=24h
         - --config.file=/etc/config/prometheus.yml
         - --storage.tsdb.path=/data
-        - --web.console.libraries=/etc/prometheus/console_libraries
-        - --web.console.templates=/etc/prometheus/consoles
         - --web.enable-lifecycle
         - --web.listen-address=:9999
-        image: quay.io/prometheus/prometheus:v2.43.1
+        image: localhost/ops-advanced-prometheus:3.16.0-20261106-r1@sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b
         imagePullPolicy: IfNotPresent
         ports:
         - name: web
@@ -71,7 +69,7 @@ spec:
             timeoutSeconds: 5
         readinessProbe:
             httpGet:
-              path: /-/healthy
+              path: /-/ready
               port: 9999      
         volumeMounts:
         - mountPath: /etc/config

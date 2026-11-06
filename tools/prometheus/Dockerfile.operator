@@ -1,0 +1,8 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental fresh-install AMD64 qualification, not an existing-TSDB upgrade.
+FROM localhost/ops-advanced-operator:20261106-registry-r1@sha256:ce213f0ac64b5da1c7ba36631c1a4aae98df4af8804c30e217aa1b8ec443c09f
+COPY --chown=1001:1001 openserverless/monitoring.py openserverless/prometheus_profile.py /home/openserverless/openserverless/
+COPY --chown=1001:1001 openserverless/files/prometheus-profile.json /home/openserverless/openserverless/files/
+COPY --chown=1001:1001 deploy/monitoring/prometheus-03-dep.yaml /home/openserverless/deploy/monitoring/prometheus-03-dep.yaml
+COPY --chown=1001:1001 tools/prometheus/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py
