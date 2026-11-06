@@ -82,7 +82,7 @@ spec:
         args:
         - --watched-dir=/etc/config
         - --reload-url=http://127.0.0.1:9999/-/reload
-        image: quay.io/prometheus-operator/prometheus-config-reloader:v0.65.1
+        image: quay.io/prometheus-operator/prometheus-config-reloader:v0.95.1@sha256:15f6aec87a20e25f33371ebf9f37bfba33d783f8f7c7dcc3448720c1a5397c2c
         imagePullPolicy: IfNotPresent        
         resources: {}
         terminationMessagePath: /dev/termination-log

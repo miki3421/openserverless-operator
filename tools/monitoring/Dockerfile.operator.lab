@@ -1,0 +1,7 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Incremental AMD64 lab image. The normal Dockerfile packages the full deploy tree.
+FROM localhost/ops-advanced-operator:20261106-certmanager-r2
+COPY --chown=1001:1001 deploy/monitoring/kubestate-03-dep.yaml /home/openserverless/deploy/monitoring/kubestate-03-dep.yaml
+COPY --chown=1001:1001 deploy/monitoring/prometheus-03-dep.yaml /home/openserverless/deploy/monitoring/prometheus-03-dep.yaml
+COPY --chown=1001:1001 tools/monitoring/refresh_archive.py /tmp/refresh_archive.py
+RUN python -B /tmp/refresh_archive.py && rm /tmp/refresh_archive.py
