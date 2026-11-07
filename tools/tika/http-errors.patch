@@ -1,0 +1,67 @@
+--- a/tika-server/tika-server-core/src/main/java/org/apache/tika/server/core/TikaServerParseExceptionMapper.java
++++ b/tika-server/tika-server-core/src/main/java/org/apache/tika/server/core/TikaServerParseExceptionMapper.java
+@@ -27,6 +27,8 @@
+ import jakarta.ws.rs.ext.ExceptionMapper;
+ import jakarta.ws.rs.ext.Provider;
+ 
++import org.eclipse.jetty.http.HttpException;
++
+ import org.apache.tika.exception.EncryptedDocumentException;
+ import org.apache.tika.exception.TikaException;
+ import org.apache.tika.exception.UnsupportedFormatException;
+@@ -45,6 +47,26 @@
+                 .getMessage()
+                 .equals(Response.Status.UNSUPPORTED_MEDIA_TYPE.toString())) {
+             return buildResponse(e, 415);
++        }
++        // Jetty 12 reports malformed request bodies through typed HTTP causes.
++        // Translate only client framing/size errors; unrelated I/O stays 500.
++        Throwable transport = e.getCause();
++        for (int depth = 0; transport != null && depth < 16; depth++) {
++            // Preserve explicit application/auth responses and outer HTTP errors.
++            if (transport instanceof WebApplicationException) {
++                break;
++            }
++            if (transport instanceof HttpException) {
++                int code = ((HttpException) transport).getCode();
++                if (code == 400 || code == 413) {
++                    return buildResponse(e, code);
++                }
++                break;
++            }
++            if (transport.getCause() == transport) {
++                break;
++            }
++            transport = transport.getCause();
+         }
+         Throwable cause = e.getCause();
+         if (cause == null) {
+--- a/tika-server/tika-server-core/src/main/java/org/apache/cxf/attachment/AttachmentDeserializerUtil.java
++++ b/tika-server/tika-server-core/src/main/java/org/apache/cxf/attachment/AttachmentDeserializerUtil.java
+@@ -109,7 +109,7 @@
+                     if (addHeaderLine(heads, buffer, maxHeadersCount, maxHeaderLength)) {
+                         totalHeadersCollected += 1;
+                         if (totalHeadersCollected > maxHeadersCount) {
+-                            throw new IOException("The attachment contains more headers than are permitted");
++                            throw new HeaderSizeExceededException();
+                         }
+                     }
+                     buffer.setLength(0);
+@@ -123,7 +123,7 @@
+         if (buffer.length() > 0 && addHeaderLine(heads, buffer, maxHeadersCount, maxHeaderLength)) {
+             totalHeadersCollected += 1;
+             if (totalHeadersCollected > maxHeadersCount) {
+-                throw new IOException("The attachment contains more headers than are permitted");
++                throw new HeaderSizeExceededException();
+             }
+         }
+         return heads;
+@@ -186,7 +186,7 @@
+         }
+         
+         if (heads.size() >= maxHeadersCount) {
+-            throw new IOException("The attachment contains more headers than are permitted");
++            throw new HeaderSizeExceededException();
+         }
+         List<String> v = heads.computeIfAbsent(name, k -> new ArrayList<>(1));
+         final int headerSize = v.stream().mapToInt(String::length).sum();

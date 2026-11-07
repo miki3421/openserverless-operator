@@ -1,0 +1,34 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# Preserve Tika 3.3.3's application APIs, parser/OCR payload and runtime image.
+FROM docker.io/miki3421/ops-advanced-tika:3.3.3-20261106-r1@sha256:0e4becdc5a464242850047c7f645bfe156aa07e4b2756b3adfc0834470f36a21 AS runtime-base
+FROM maven:3.9.11-eclipse-temurin-21@sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237 AS build
+RUN git clone --depth 1 --filter=blob:none --sparse --branch 3.3.3 https://github.com/apache/tika /src \
+ && cd /src \
+ && test "$(git rev-parse HEAD)" = f82f5d34ffab24069ca222fe4f8888a9d07f9062 \
+ && git sparse-checkout set tika-parent tika-server
+WORKDIR /src
+ADD --checksum=sha256:72d95931ce314fb115777273e063616ba468c5a1b85e05dc26eae6ada4f17199 https://repo.maven.apache.org/maven2/org/apache/cxf/cxf-core/4.1.9/cxf-core-4.1.9-sources.jar /tmp/cxf-sources.jar
+RUN mkdir -p /tmp/cxf-source \
+ && cd /tmp/cxf-source \
+ && jar xf /tmp/cxf-sources.jar org/apache/cxf/attachment/AttachmentDeserializerUtil.java \
+ && echo 'c5e77f7a395aafcd80aa77746bc07d70a8b1cb8fe17f3a3d790531a775b45356  org/apache/cxf/attachment/AttachmentDeserializerUtil.java' | sha256sum -c - \
+ && mkdir -p /src/tika-server/tika-server-core/src/main/java/org/apache/cxf/attachment \
+ && cp org/apache/cxf/attachment/AttachmentDeserializerUtil.java /src/tika-server/tika-server-core/src/main/java/org/apache/cxf/attachment/
+COPY tools/tika/http-errors.patch /tmp/http-errors.patch
+RUN git apply --check /tmp/http-errors.patch && git apply /tmp/http-errors.patch
+RUN mvn -B -ntp --strict-checksums -f tika-server/pom.xml -pl tika-server-standard -am \
+      -Dcxf.version=4.1.9 -Djetty.version=12.0.39 \
+      -DskipTests -Dcheckstyle.skip -Drat.skip -Dmaven.javadoc.skip=true \
+      -Dassembly.skipAssembly=true -Dproject.build.outputTimestamp=2026-11-07T00:00:00Z package
+COPY --from=runtime-base /tika-server-standard-3.3.3.jar /original.jar
+COPY tools/tika/VerifyHttpDependencies.java /qa/VerifyHttpDependencies.java
+RUN javac -d /qa /qa/VerifyHttpDependencies.java \
+ && java -cp /qa VerifyHttpDependencies /original.jar \
+      /src/tika-server/tika-server-standard/target/tika-server-standard-3.3.3.jar
+COPY tools/tika/TikaHttpExceptionProbe.java /qa/TikaHttpExceptionProbe.java
+RUN javac -cp /src/tika-server/tika-server-standard/target/tika-server-standard-3.3.3.jar -d /qa /qa/TikaHttpExceptionProbe.java \
+ && java -Xmx128m -cp /qa:/src/tika-server/tika-server-standard/target/tika-server-standard-3.3.3.jar TikaHttpExceptionProbe
+FROM runtime-base
+COPY --from=build --chown=35002:35002 /src/tika-server/tika-server-standard/target/tika-server-standard-3.3.3.jar /tika-server-standard-3.3.3.jar
+LABEL org.opencontainers.image.version="3.3.3-adv.http.3" \
+      org.opencontainers.image.source="https://github.com/miki3421/openserverless-operator"

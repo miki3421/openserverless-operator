@@ -23,3 +23,5 @@
 *.jpg binary
 # Unified-diff context prefixes intentionally precede Go tabs and empty lines.
 images/milvus/zero-grace.patch -whitespace
+# Preserve the exact upstream context (including blank lines) in this patch.
+tools/tika/http-errors.patch -whitespace
