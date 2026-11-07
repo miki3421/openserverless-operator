@@ -1,0 +1,392 @@
+{
+  "date": "2026-11-07",
+  "scope": "single-node AMD64 ADV laboratory, fresh platform installation",
+  "kubernetes": "v1.36.4+k3s1",
+  "baselineModified": false,
+  "customRegistry": "Docker Hub miki3421",
+  "customImageInputs": 19,
+  "customInputsAnonymousManifestVerified": true,
+  "customImagesPreloaded": false,
+  "initialInfrastructurePods": 44,
+  "initialInfrastructurePodsReadyOrSucceeded": true,
+  "frontends": {
+    "http200": 2,
+    "htmlVerified": true
+  },
+  "suites": [
+    {
+      "suite": "application-security",
+      "passed": 12,
+      "failed": 0,
+      "checks": [
+        {
+          "test": "alpha_owner_workflow",
+          "status": "PASS"
+        },
+        {
+          "test": "alpha_persistence_read",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_owner_workflow",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_persistence_read",
+          "status": "PASS"
+        },
+        {
+          "test": "alpha_anonymous_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "alpha_wrong_auth_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "alpha_peer_credentials_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "alpha_tenant_input_rejected",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_anonymous_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_wrong_auth_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_peer_credentials_denied",
+          "status": "PASS"
+        },
+        {
+          "test": "beta_tenant_input_rejected",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "suite": "streaming",
+      "passed": 24,
+      "failed": 0,
+      "checks": [
+        {
+          "tenant": "alpha",
+          "check": "web_get",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 2312.31
+        },
+        {
+          "tenant": "alpha",
+          "check": "web_post",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 184.89
+        },
+        {
+          "tenant": "alpha",
+          "check": "action_get",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 176.27
+        },
+        {
+          "tenant": "alpha",
+          "check": "action_post",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 177.59
+        },
+        {
+          "tenant": "beta",
+          "check": "web_get",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 1432.45
+        },
+        {
+          "tenant": "beta",
+          "check": "web_post",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 180.82
+        },
+        {
+          "tenant": "beta",
+          "check": "action_get",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 184.65
+        },
+        {
+          "tenant": "beta",
+          "check": "action_post",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 176.65
+        },
+        {
+          "tenant": "alpha",
+          "check": "concurrent_request_and_tenant_correlation",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 1456.28
+        },
+        {
+          "tenant": "beta",
+          "check": "concurrent_request_and_tenant_correlation",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 204.91
+        },
+        {
+          "tenant": "alpha",
+          "check": "concurrent_request_and_tenant_correlation",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 193.88
+        },
+        {
+          "tenant": "beta",
+          "check": "concurrent_request_and_tenant_correlation",
+          "status": "PASS",
+          "status_code": 200,
+          "valid": true,
+          "progressive": true,
+          "duration_ms": 1453.18
+        },
+        {
+          "tenant": "alpha",
+          "check": "web_anonymous",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "alpha",
+          "check": "web_invalid_auth",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "alpha",
+          "check": "web_peer_auth",
+          "status": "PASS",
+          "status_code": 403
+        },
+        {
+          "tenant": "alpha",
+          "check": "action_anonymous",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "alpha",
+          "check": "action_invalid_auth",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "alpha",
+          "check": "action_peer_auth",
+          "status": "PASS",
+          "status_code": 403
+        },
+        {
+          "tenant": "beta",
+          "check": "web_anonymous",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "beta",
+          "check": "web_invalid_auth",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "beta",
+          "check": "web_peer_auth",
+          "status": "PASS",
+          "status_code": 403
+        },
+        {
+          "tenant": "beta",
+          "check": "action_anonymous",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "beta",
+          "check": "action_invalid_auth",
+          "status": "PASS",
+          "status_code": 401
+        },
+        {
+          "tenant": "beta",
+          "check": "action_peer_auth",
+          "status": "PASS",
+          "status_code": 403
+        }
+      ]
+    },
+    {
+      "suite": "direct-backend-read-isolation",
+      "passed": 10,
+      "failed": 0,
+      "checks": [
+        {
+          "component": "postgres",
+          "direction": "alpha_to_beta",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "postgres",
+          "direction": "beta_to_alpha",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "mongo",
+          "direction": "alpha_to_beta",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "mongo",
+          "direction": "beta_to_alpha",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "redis",
+          "direction": "alpha_to_beta",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "redis",
+          "direction": "beta_to_alpha",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "s3",
+          "direction": "alpha_to_beta",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "s3",
+          "direction": "beta_to_alpha",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "milvus",
+          "direction": "alpha_to_beta",
+          "status": "PASS",
+          "reason": "permission_denied"
+        },
+        {
+          "component": "milvus",
+          "direction": "beta_to_alpha",
+          "status": "PASS",
+          "reason": "permission_denied"
+        }
+      ]
+    },
+    {
+      "suite": "scheduled-heartbeats",
+      "passed": 2,
+      "failed": 0,
+      "checks": [
+        {
+          "tenant": "alpha",
+          "status": "PASS",
+          "distinct_heartbeats": 2,
+          "observed_heartbeats": [
+            "2026-11-07T09:53:04.607215+00:00",
+            "2026-11-07T09:54:03.546888+00:00"
+          ],
+          "successful_scheduler_activations": 0,
+          "heartbeat_spacing_seconds": 58.939673,
+          "manual_invocation": false,
+          "matched_scheduler_dispatches": 2,
+          "verification_method": "scheduled_dispatch_and_redis_heartbeat",
+          "activation_history": "NOT_AVAILABLE"
+        },
+        {
+          "tenant": "beta",
+          "status": "PASS",
+          "distinct_heartbeats": 2,
+          "observed_heartbeats": [
+            "2026-11-07T09:53:04.607165+00:00",
+            "2026-11-07T09:54:03.557066+00:00"
+          ],
+          "successful_scheduler_activations": 0,
+          "heartbeat_spacing_seconds": 58.949901,
+          "manual_invocation": false,
+          "matched_scheduler_dispatches": 2,
+          "verification_method": "scheduled_dispatch_and_redis_heartbeat",
+          "activation_history": "NOT_AVAILABLE"
+        }
+      ]
+    }
+  ],
+  "activationRetention": {
+    "days": 30,
+    "schedule": "17 3 * * *",
+    "jobImage": "docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-r1",
+    "jobExecution": "NOT_RUN"
+  },
+  "activationHistory": "NOT_AVAILABLE",
+  "cronVerification": "completed scheduler dispatches correlated with Redis heartbeats",
+  "streamerFixture": "headless Service endpoint verified against current streamer pod",
+  "independentReview": "NOT_RUN",
+  "directBackendWriteIsolation": "NOT_RUN",
+  "productionQualified": false,
+  "arm64Qualified": false,
+  "sources": {
+    "task": "9a63b915ef29088e8c81b5bf9a84b80e85295354",
+    "operatorReceipt": "19e0196c1af2c0aa9cf10058488c4a7263f255c2",
+    "operatorImplementation": "701612cc2c99b95c7c8ae5d106e98bb067772f06"
+  },
+  "applicationFixture": {
+    "baseCommit": "e2744b6",
+    "existingUnpublishedStreamingOverlay": true,
+    "members": {
+      "lib/validation_core/api.py": "110a38aed412695f0d6a7eddba3cd25d91c9c6e0e5ec170ad2a51f394ff46272",
+      "tools/streamer_probe.py": "0009e3af6c6b376091ad9e6b7022c139cb914e5f80e1a1c163611e43da087dd0",
+      "tests/test_streamer.py": "eb076e141e241832340dc0a5209d025872aeb6a66120841d4594d760e256123c"
+    },
+    "unitTestsPassed": 14
+  }
+}

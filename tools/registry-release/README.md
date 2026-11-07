@@ -1,5 +1,12 @@
 # ADV registry release layer
 
+The recipe below builds the registry-relocation parent. The final fresh-install
+candidate also includes the compatible ZooKeeper layer; use the current pins in
+`release-images.json` and
+[`docs/advanced-fresh-dockerhub-20261107.md`](../../docs/advanced-fresh-dockerhub-20261107.md)
+for the selected image and observed qualification, rather than installing the
+older parent tag from this build example.
+
 The Dockerfile relocates qualified AMD64 component references to the personal
 Docker Hub namespace `miki3421`. Build it from the operator repository root:
 
