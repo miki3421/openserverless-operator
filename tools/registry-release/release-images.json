@@ -1,0 +1,65 @@
+{
+  "platform": "linux/amd64",
+  "images": [
+    {
+      "image": "docker.io/miki3421/ops-advanced-admin-api:20261105-r1",
+      "digest": "sha256:000ff4888b8b905ea8e06a6ff3534ed48de7e4c1ce405ce1e30222023dd86a7a"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-alertmanager:0.34.2-20261106-r1",
+      "digest": "sha256:899999e4ef1aced4e2fcd287065b8ae6bcf7488ed9d715f6c8b6845743ca3058"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-controller:20261106-kafka-azure-r3",
+      "digest": "sha256:e926b6578abdf8ff0c3be1a1477e89ae098d4c3a84764d034562783476d90c57"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-invoker:20261106-kafka-azure-r3",
+      "digest": "sha256:0190540ea64c7187870e6298148061c245a486ea6bd64d10e81fd2311d1577d4"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-kube-state-metrics:2.20.0-20261106-r2",
+      "digest": "sha256:f42762c8e0481058ba74a998cf5ed27e8e06be1c0729b2763946ff47db6f0b3e"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-nodejs:22-20261106-npm-r2",
+      "digest": "sha256:4e1430540a366c0f750d122afef304d3076d9c237453b8a46e0e9f26aead5ae4"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-operator:20261107-dockerhub-r1",
+      "digest": "sha256:263c67d884ae41fef3a9619e9f6c39c9801c322a6c2cf3fc33432e2d18369274"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-prometheus:3.16.0-20261106-r1",
+      "digest": "sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-python:3.12-20261105-r1",
+      "digest": "sha256:1b935970f83b0cf15c9e0d807f830e653f25c7d87ef26182cc41f9fa3447c011"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-python:3.15-20261105-r1",
+      "digest": "sha256:e60c0ff5ee71471003a58a046e93fab1e75d66702ae63791d01c299b66ad96e9"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-python:sys-20261105-r1",
+      "digest": "sha256:a457cce7c40888898c98dcf8709bff77d3470f6ec10474536e633912404dc412"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-registry:3.1.2-20261106-r1",
+      "digest": "sha256:75a843bf4b74c23c6776dbabbbd674b1ba5bc4ff1a1b7af3bce5d31a2b866351"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-streamer:20261106-go1273-r1",
+      "digest": "sha256:5aa7a68a4be7ea75f20de996656623a46d639d2d933856ae393d979a1f374911"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-tika:3.3.3-20261106-r1",
+      "digest": "sha256:0e4becdc5a464242850047c7f645bfe156aa07e4b2756b3adfc0834470f36a21"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-volume-exporter:20261105-r2",
+      "digest": "sha256:093ff7128164d3d4740528cdd4bd65b821e589f175a26630212acf25a087bdee"
+    }
+  ]
+}
