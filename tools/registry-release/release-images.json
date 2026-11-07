@@ -78,8 +78,8 @@
       "digest": "sha256:137adefa2395428d951f0846ec5a442e98e0d574d7d4efe78bd4fcee1bea4718"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-java-r1",
-      "digest": "sha256:5ad34632f257ab25ce4fe6851757da72d88c9bb2ba9a7adaf1eedd988794d1ef"
+      "image": "docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1",
+      "digest": "sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1"
     }
   ]
 }

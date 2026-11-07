@@ -1,0 +1,74 @@
+{
+  "verifiedAt": "2026-11-07T14:04:10.190986+00:00",
+  "platform": "linux/amd64",
+  "nginxVersion": "1.30.6",
+  "operatorImage": "docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1@sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1",
+  "staticImage": "docker.io/nginx/nginx-unprivileged:1.30.6@sha256:e17bfe33eecc8fd86ca9f12c665f21270b0d88b09a0f13bfdede3fcd795f5fda",
+  "identities": [
+    {
+      "pod": "openserverless-static-0",
+      "image": "docker.io/nginx/nginx-unprivileged:1.30.6@sha256:e17bfe33eecc8fd86ca9f12c665f21270b0d88b09a0f13bfdede3fcd795f5fda",
+      "imageID": "docker.io/nginx/nginx-unprivileged@sha256:e17bfe33eecc8fd86ca9f12c665f21270b0d88b09a0f13bfdede3fcd795f5fda",
+      "ready": true
+    },
+    {
+      "pod": "openserverless-operator-0",
+      "image": "docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1@sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1",
+      "imageID": "docker.io/miki3421/ops-advanced-operator@sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1",
+      "ready": true
+    }
+  ],
+  "alphaBetaPassCounts": {
+    "apps.json": 12,
+    "backend-isolation.json": 10,
+    "streaming.json": 24,
+    "cron-correlated.json": 2
+  },
+  "alphaBetaTotal": 48,
+  "frontend": [
+    {
+      "tenant": "alpha",
+      "status": "PASS",
+      "indexAndAssetsUnchanged": true,
+      "assetsVerified": 2
+    },
+    {
+      "tenant": "beta",
+      "status": "PASS",
+      "indexAndAssetsUnchanged": true,
+      "assetsVerified": 2
+    }
+  ],
+  "staticConfigAndServicePreserved": true,
+  "statefulSetIdentityAndVolumesPreserved": true,
+  "readyControllers": 22,
+  "cronJobImages": [
+    {
+      "name": "activation-cleanup",
+      "images": [
+        "docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1@sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1"
+      ]
+    },
+    {
+      "name": "cron-init",
+      "images": [
+        "docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-java-r1@sha256:5ad34632f257ab25ce4fe6851757da72d88c9bb2ba9a7adaf1eedd988794d1ef"
+      ]
+    },
+    {
+      "name": "quota-checker",
+      "images": [
+        "docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-java-r1@sha256:5ad34632f257ab25ce4fe6851757da72d88c9bb2ba9a7adaf1eedd988794d1ef"
+      ]
+    }
+  ],
+  "inheritedCronJobPolicy": "Unchanged cron-init/quota jobs may retain the qualified parent image; identical code and dependencies. The operator environment pins newly generated jobs to its new immutable image.",
+  "cronMethod": "current CronJob-owned completed jobs, exact HTTP 202 dispatch logs and Redis heartbeats; activation history unavailable",
+  "backendWriteIsolationQualified": false,
+  "baselineMutated": false,
+  "operatorUnitTestsPassed": 228,
+  "taskImageTestsPassed": 4,
+  "localHttpChecksPassed": 20,
+  "freshFullInstallQualified": false,
+  "newScannerRun": false
+}

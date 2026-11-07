@@ -39,7 +39,7 @@ spec:
         command: ['sh', '-c', "until nslookup {{storage_hostname}}; do echo waiting for storage; sleep 2; done"]     
       containers:
       - name: openserverless-static
-        image: nginxinc/nginx-unprivileged:1.24
+        image: docker.io/nginx/nginx-unprivileged:1.30.6@sha256:e17bfe33eecc8fd86ca9f12c665f21270b0d88b09a0f13bfdede3fcd795f5fda
         ports:
         - containerPort: 8080                      
         volumeMounts:
@@ -63,4 +63,4 @@ spec:
             name: nginx-static-conf-cm
             items:
               - key: nginx.conf
-                path: nginx.conf               
+                path: nginx.conf

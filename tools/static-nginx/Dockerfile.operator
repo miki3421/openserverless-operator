@@ -1,0 +1,5 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# The deploy tree is already qualified; fix its overriding runtime template.
+FROM docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-java-r1@sha256:5ad34632f257ab25ce4fe6851757da72d88c9bb2ba9a7adaf1eedd988794d1ef
+ENV OPERATOR_TAG=20261107-static-template-r1
+COPY --chown=1001:1001 openserverless/templates/nginx-static-sts.yaml /home/openserverless/openserverless/templates/nginx-static-sts.yaml

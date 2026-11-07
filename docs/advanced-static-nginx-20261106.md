@@ -1,5 +1,11 @@
 # ADV static Nginx qualification
 
+Historical qualification: a later fresh deployment exposed an overriding runtime
+template that still selected 1.24. See
+[the 2026-11-07 correction](advanced-static-nginx-20261107.md) for the source fix,
+published operator identity and subsequent live qualification. The earlier scan
+and test results below remain historical evidence.
+
 The static proxy previously used nginx-unprivileged 1.24 on Debian 11. The
 AMD64 ADV candidate uses the upstream unprivileged 1.30.6 image on Debian 13,
 with an immutable platform manifest. This is a standalone proxy change;
