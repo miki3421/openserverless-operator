@@ -26,10 +26,6 @@
       "digest": "sha256:4e1430540a366c0f750d122afef304d3076d9c237453b8a46e0e9f26aead5ae4"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-operator:20261107-dockerhub-r1",
-      "digest": "sha256:263c67d884ae41fef3a9619e9f6c39c9801c322a6c2cf3fc33432e2d18369274"
-    },
-    {
       "image": "docker.io/miki3421/ops-advanced-prometheus:3.16.0-20261106-r1",
       "digest": "sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b"
     },
@@ -72,6 +68,14 @@
     {
       "image": "docker.io/miki3421/ops-advanced-pg-dumper:18.6-pgvector0.8.6-dev",
       "digest": "sha256:b2bb10e4caf3d8eed37006bd12a352058ef4285a477539e3dc0b73435475837d"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r2",
+      "digest": "sha256:8a6aba58c5455cdf8673f12de4818fec0fd2811ce388e06bcf9dbb6ac3e20a8c"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-operator:20261107-zookeeper-r1",
+      "digest": "sha256:3e593815523645853b2b0a79c24698da12dff46166fa07304186684077bba9a6"
     }
   ]
 }
