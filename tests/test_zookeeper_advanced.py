@@ -24,6 +24,23 @@ class ZooKeeperProfileTests(unittest.TestCase):
         for claim in PROFILE["claims"]:
             with self.assertRaises(RuntimeError):validate_existing(None, {"items": [{"metadata": {"name": claim}}]})
 
+    def test_only_exact_qualified_patch_source_may_reuse_the_same_layout(self):
+        for image in PROFILE["compatiblePatchImages"]:
+            current = self.current()
+            current["spec"]["template"]["spec"]["containers"][0]["image"] = image
+            validate_existing(current, {"items": []})
+            for bad in (image.split("@")[0], image[:-1] + ("0" if image[-1] != "0" else "1")):
+                current["spec"]["template"]["spec"]["containers"][0]["image"] = bad
+                with self.assertRaises(RuntimeError):validate_existing(current, {"items": []})
+
+    def test_qualified_patch_image_does_not_bypass_mount_guards(self):
+        for image in PROFILE["compatiblePatchImages"]:
+            current = self.current()
+            server = current["spec"]["template"]["spec"]["containers"][0]
+            server["image"] = image
+            server["volumeMounts"][1]["subPath"] = "unqualified"
+            with self.assertRaises(RuntimeError):validate_existing(current, {"items": []})
+
     def test_different_topology_and_volume_layout_refused(self):
         bad = self.current();bad["spec"]["replicas"] = 3
         with self.assertRaises(RuntimeError):validate_existing(bad, {"items": []})

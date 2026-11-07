@@ -16,7 +16,8 @@ def validate_existing(existing, pvcs):
     pod = spec.get("template", {}).get("spec", {})
     containers = pod.get("containers", [])
     server = next((c for c in containers if c.get("name") == "zookeeper"), {})
-    if len(containers) != 1 or server.get("image") != PROFILE["image"] or spec.get("replicas", 1) != 1:
+    qualified_images = [PROFILE["image"], *PROFILE.get("compatiblePatchImages", [])]
+    if len(containers) != 1 or server.get("image") not in qualified_images or spec.get("replicas", 1) != 1:
         raise RuntimeError("Existing ZooKeeper image/topology requires explicit migration; nothing was applied")
     for claim, path in claims.items():
         volumes = [v for v in pod.get("volumes", []) if v.get("name") == claim]

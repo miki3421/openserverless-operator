@@ -6,6 +6,6 @@
   },
   "replacements": {
     "zookeeper/zookeeper-000-cm.yaml": "183c62fdbb39d2f741014f71ee6096e9851475241602ce6a9152ccb37f2acb4c",
-    "zookeeper/zookeeper-003-sts.yaml": "653989a2c36646faa621fd35f9f1be09042737d3a4e8dd4ffe2aff0348615b1a"
+    "zookeeper/zookeeper-003-sts.yaml": "071acd6d3ad0c1f9bff986a2b6bf3f65a9274e10f2a947308b93531376e7b64d"
   }
 }

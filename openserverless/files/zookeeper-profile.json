@@ -1,10 +1,13 @@
 {
   "version": "3.9.7",
-  "image": "docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r2@sha256:8a6aba58c5455cdf8673f12de4818fec0fd2811ce388e06bcf9dbb6ac3e20a8c",
+  "image": "docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r3@sha256:137adefa2395428d951f0846ec5a442e98e0d574d7d4efe78bd4fcee1bea4718",
   "statefulset": "zookeeper",
   "claims": {
     "zookeeper-pvc-data": "/data",
     "zookeeper-pvc-datalog": "/datalog"
   },
-  "replicas": 1
+  "replicas": 1,
+  "compatiblePatchImages": [
+    "docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r2@sha256:8a6aba58c5455cdf8673f12de4818fec0fd2811ce388e06bcf9dbb6ac3e20a8c"
+  ]
 }

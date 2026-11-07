@@ -1,6 +1,6 @@
 # Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
 FROM docker.io/miki3421/ops-advanced-operator:20261107-dockerhub-r1@sha256:263c67d884ae41fef3a9619e9f6c39c9801c322a6c2cf3fc33432e2d18369274
-ENV OPERATOR_TAG=20261107-zookeeper-r1
+ENV OPERATOR_TAG=20261107-zookeeper-java-r1
 COPY --chown=1001:1001 openserverless/zookeeper.py openserverless/zookeeper_profile.py /home/openserverless/openserverless/
 COPY --chown=1001:1001 openserverless/files/zookeeper-profile.json /home/openserverless/openserverless/files/
 COPY --chown=1001:1001 deploy/zookeeper/zookeeper-000-cm.yaml deploy/zookeeper/zookeeper-003-sts.yaml /home/openserverless/deploy/zookeeper/
