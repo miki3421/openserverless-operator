@@ -16,7 +16,6 @@
 # under the License.
 
 ---
-# Source: openwhisk/templates/kafka-svc.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -32,7 +31,7 @@ spec:
   - name: broker
     port: 9092
   - name: metrics
-    port: 9071 
+    port: 9071
   - name: volume-metrics
-    port: 9888      
-
+    port: 9888
+  publishNotReadyAddresses: true

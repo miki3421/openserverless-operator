@@ -1,0 +1,10 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+FROM docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1@sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1
+ENV OPERATOR_TAG=20261107-kafka-kraft-r1
+COPY --chown=1001:1001 openserverless/kafka.py openserverless/kafka_profile.py /home/openserverless/openserverless/
+COPY --chown=1001:1001 openserverless/files/kafka-profile.json /home/openserverless/openserverless/files/
+COPY --chown=1001:1001 openserverless/templates/kafka-000-pvc.yaml openserverless/templates/kafka-001-sts.yaml /home/openserverless/openserverless/templates/
+COPY --chown=1001:1001 deploy/kafka/kafka-000-pvc.yaml deploy/kafka/kafka-001-sts.yaml deploy/kafka/kafka-003-svc.yaml deploy/kafka/kafka-004-networkpolicy.yaml /home/openserverless/deploy/kafka/
+COPY --chown=1001:1001 tools/kafka-kraft/archive-inputs.json /tmp/kafka-archive-inputs.json
+COPY --chown=1001:1001 tools/kafka-kraft/refresh_archive.py /tmp/refresh-kafka-archive.py
+RUN python /tmp/refresh-kafka-archive.py && rm /tmp/kafka-archive-inputs.json /tmp/refresh-kafka-archive.py

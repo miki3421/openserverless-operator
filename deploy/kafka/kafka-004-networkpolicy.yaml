@@ -23,29 +23,44 @@ spec:
   podSelector:
     matchLabels:
       name: kafka
-  policyTypes: [Ingress]
+  policyTypes:
+  - Ingress
   ingress:
-    - from:
-        - podSelector:
-            matchExpressions:
-              - key: name
-                operator: In
-                values: [controller, invoker, scheduler, kafka]
-              - key: user-action-pod
-                operator: DoesNotExist
-      ports:
-        - port: 9092
-          protocol: TCP
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: prometheus
-              app.kubernetes.io/instance: openserverless-prometheus
-            matchExpressions:
-              - key: user-action-pod
-                operator: DoesNotExist
-      ports:
-        - port: 9071
-          protocol: TCP
-        - port: 9888
-          protocol: TCP
+  - from:
+    - podSelector:
+        matchExpressions:
+        - key: name
+          operator: In
+          values:
+          - controller
+          - invoker
+          - scheduler
+          - kafka
+        - key: user-action-pod
+          operator: DoesNotExist
+    ports:
+    - port: 9092
+      protocol: TCP
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+          app.kubernetes.io/instance: openserverless-prometheus
+        matchExpressions:
+        - key: user-action-pod
+          operator: DoesNotExist
+    ports:
+    - port: 9071
+      protocol: TCP
+    - port: 9888
+      protocol: TCP
+  - from:
+    - podSelector:
+        matchLabels:
+          name: kafka
+        matchExpressions:
+        - key: user-action-pod
+          operator: DoesNotExist
+    ports:
+    - port: 9093
+      protocol: TCP

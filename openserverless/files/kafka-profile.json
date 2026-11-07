@@ -1,0 +1,10 @@
+{
+  "version": "4.4.0",
+  "image": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4@sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd",
+  "mode": "kraft-single-v1",
+  "replicas": 1,
+  "uid": 1000,
+  "claim": "kafka-kraft-pvc-data",
+  "mountPath": "/kafka",
+  "logDirectory": "/kafka/kraft-logs"
+}

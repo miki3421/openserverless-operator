@@ -1,0 +1,9 @@
+{
+  "memberCount": 148,
+  "members": {
+    "kafka/kafka-000-pvc.yaml": "f3dcc320fa67ab2d6cc2d18deef68d103801f8a39f2eb6611d8893e324800dfa",
+    "kafka/kafka-001-sts.yaml": "a15539ca6565fc836706f378131679f75adcf26d0a4b50837b6aa6e8db76ee15",
+    "kafka/kafka-003-svc.yaml": "9dfab2806e6b93df65652bf8fc67477b39a5c6ed966673323d33a42813d4aa0d",
+    "kafka/kafka-004-networkpolicy.yaml": "97d81af779e12bad89c30b58996a3da0b3341fe710cc98cc92955101b9ef37ef"
+  }
+}

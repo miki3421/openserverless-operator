@@ -78,8 +78,12 @@
       "digest": "sha256:137adefa2395428d951f0846ec5a442e98e0d574d7d4efe78bd4fcee1bea4718"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-operator:20261107-static-template-r1",
-      "digest": "sha256:3eedc771131c01ba26b62f42fccccf29ca62f9dd1e16531e125f1272cdd375e1"
+      "image": "docker.io/miki3421/ops-advanced-operator:20261107-kafka-kraft-r1",
+      "digest": "sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4",
+      "digest": "sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd"
     }
   ]
 }

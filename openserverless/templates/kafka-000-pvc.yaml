@@ -19,10 +19,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: kafka-pvc-data
+  name: {{claim}}
   namespace: openserverless
   labels:
     app: kafka
+    openserverless.org/kafka-profile: kraft-single-v1
 spec:
   storageClassName: {{storage_class}}
   accessModes:

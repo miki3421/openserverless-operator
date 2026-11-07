@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-07",
+  "scope": "fresh Kafka component in separate AMD64 K3s VM; canonical provider render and guarded profile",
+  "broker": {
+    "image": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4@sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd",
+    "manifest": "sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd",
+    "config": "sha256:9fd5dbe02b55f21cdddcab273993eb751e7832f356ce9e08175e943f7276f7d3",
+    "platform": "linux/amd64",
+    "anonymousRegistryVerified": true
+  },
+  "operator": {
+    "image": "docker.io/miki3421/ops-advanced-operator:20261107-kafka-kraft-r1@sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14",
+    "manifest": "sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14",
+    "config": "sha256:557ba4093f8e3b5539820ffe429ef2fd4483f1e55d6733ba26cc32fac473347a",
+    "platform": "linux/amd64",
+    "anonymousRegistryVerified": true
+  },
+  "versions": {
+    "kafka": "4.4.0",
+    "java": "25.0.4.1+1",
+    "jmxExporter": "1.7.0",
+    "lz4": "1.11.4",
+    "snappy": "1.1.10.12"
+  },
+  "freshKraftWithoutZooKeeper": true,
+  "unprivilegedUid": 1000,
+  "localClientChecks": {
+    "controller": 35,
+    "invoker": 35
+  },
+  "kubernetesClientChecks": {
+    "controller": 35,
+    "invoker": 35
+  },
+  "persistenceChecks": {
+    "seed": 4,
+    "resume": 3,
+    "sameMetadataBytes": true,
+    "sameStatefulSetAndPvc": true,
+    "newPod": true
+  },
+  "boundaryAndMetrics": [
+    {
+      "check": "control-before",
+      "status": "PASS",
+      "witness": [
+        "PASS_allowed_9092",
+        "PASS_allowed_9093"
+      ]
+    },
+    {
+      "check": "action-denied-v2",
+      "status": "PASS",
+      "witness": [
+        "PASS_denied_refused_9092",
+        "PASS_denied_refused_9093"
+      ]
+    },
+    {
+      "check": "control-after",
+      "status": "PASS",
+      "witness": [
+        "PASS_allowed_9092",
+        "PASS_allowed_9093"
+      ]
+    },
+    {
+      "check": "metrics",
+      "status": "PASS",
+      "witness": [
+        "PASS_metrics"
+      ]
+    },
+    {
+      "check": "quorum-allowed",
+      "status": "PASS",
+      "witness": [
+        "PASS_quorum_socket"
+      ]
+    }
+  ],
+  "startupRefusalChecks": 7,
+  "operatorUnitTests": 240,
+  "taskImageTests": 4,
+  "realProfilePreflightAccepted": true,
+  "trivy": {
+    "version": "0.76.2",
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "db": {
+      "Version": 2,
+      "NextUpdate": "2026-11-07T18:59:52.855177045Z",
+      "UpdatedAt": "2026-11-06T18:59:52.855177206Z",
+      "DownloadedAt": "2026-11-06T21:19:57.217956531Z"
+    },
+    "dbSha256": "112895ef5c65cfe71007fc6d1ba8df0b6652412cd5c869f95e3d4723b4912508",
+    "previousUnpatchedCandidate": {
+      "critical": 1,
+      "high": 10,
+      "medium": 3,
+      "low": 1
+    },
+    "legacyBrokerSameDatabaseScan": "not run; legacy image not present in host cache"
+  },
+  "existingAdvBrokerChanged": false,
+  "baselineChanged": false,
+  "newAlphaBetaAcceptance": false,
+  "fullOpsFreshInstallQualified": false,
+  "arm64Qualified": false,
+  "haQualified": false,
+  "legacyKafkaMigration": "backlog; operator refuses implicit adoption"
+}

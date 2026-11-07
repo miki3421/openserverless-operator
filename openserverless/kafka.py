@@ -20,7 +20,7 @@ import openserverless.kube as kube
 import openserverless.kustomize as kus
 import openserverless.config as cfg
 import openserverless.enterprise_util as cfg_util
-import openserverless.enterprise_util as cfg_util
+import openserverless.kafka_profile as profile
 import openserverless.util as util
 import openserverless.messaging_security as security
 
@@ -42,13 +42,9 @@ def get_kafka_connect_data():
 
 def create(owner=None):
     logging.info(f"*** configuring kafka")
-    zookeeper_url = cfg.get("openserverless.zookeeper.url") or "zookeeper-0.zookeeper:2181"
-    zookeper_data = zookeeper_url.split(":")
-
+    profile.preflight(kube.kubectl)
     data = cfg_util.get_kafka_config_data()
-    data["zookeeper_url"] = zookeeper_url
-    data["zookeeper_host"] = zookeper_data[0]
-    data["zookeeper_port"] = zookeper_data[1]
+    data.update(image=profile.PROFILE['image'], claim=profile.PROFILE['claim'])
     
     tplp = ["kafka-000-pvc.yaml","kafka-001-sts.yaml"]
     if(data['affinity'] or data['tolerations']):
