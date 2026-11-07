@@ -22,6 +22,7 @@ import openserverless.config as cfg
 import openserverless.enterprise_util as cfg_util
 import openserverless.util as util
 import openserverless.messaging_security as security
+import openserverless.zookeeper_profile as profile
 
 def get_zookeeper_pod_name():
     pod_name = kube.kubectl("get", "pods", jsonpath="{.items[?(@.metadata.labels.app == 'zookeeper')].metadata.name}")
@@ -41,6 +42,7 @@ def get_zookeeper_connect_data():
 
 def create(owner=None):
     logging.info("*** configuring zookeeper")
+    profile.preflight(kube.kubectl)
 
     data = cfg_util.get_zookeeper_config_data()
     

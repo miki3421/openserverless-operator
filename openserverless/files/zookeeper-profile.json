@@ -1,0 +1,10 @@
+{
+  "version": "3.9.7",
+  "image": "docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r2@sha256:8a6aba58c5455cdf8673f12de4818fec0fd2811ce388e06bcf9dbb6ac3e20a8c",
+  "statefulset": "zookeeper",
+  "claims": {
+    "zookeeper-pvc-data": "/data",
+    "zookeeper-pvc-datalog": "/datalog"
+  },
+  "replicas": 1
+}

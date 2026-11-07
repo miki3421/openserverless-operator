@@ -25,7 +25,7 @@ metadata:
     app: zookeeper
 spec:
   serviceName: zookeeper
-  podManagementPolicy: "Parallel"
+  podManagementPolicy: Parallel
   replicas: 1
   selector:
     matchLabels:
@@ -33,29 +33,34 @@ spec:
   template:
     metadata:
       annotations:
-        openserverless.org/messaging-isolation: "v1"
+        openserverless.org/messaging-isolation: v1
       labels:
         name: zookeeper
         app: zookeeper
     spec:
-      restartPolicy: "Always"
-
+      restartPolicy: Always
       volumes:
-        - name: zk-config
-          configMap:
-            name: zookeeper         
-        - name: "zookeeper-pvc-data"
-          persistentVolumeClaim:
-            claimName: "zookeeper-pvc-data"
-        - name: "zookeeper-pvc-datalog"
-          persistentVolumeClaim:
-            claimName: "zookeeper-pvc-datalog"
-      
+      - name: zk-config
+        configMap:
+          name: zookeeper
+      - name: zookeeper-pvc-data
+        persistentVolumeClaim:
+          claimName: zookeeper-pvc-data
+      - name: zookeeper-pvc-datalog
+        persistentVolumeClaim:
+          claimName: zookeeper-pvc-datalog
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
       containers:
       - name: zookeeper
-        image: "ghcr.io/nuvolaris/zookeeper:3.4.14"
-        imagePullPolicy: "IfNotPresent"
-        command: ["/bin/bash", "-c", "hostname -s | awk -F '-' '{print $NF}'> /data/myid; cat /data/myid; cat /conf/zoo.cfg; zkServer.sh start-foreground"]
+        image: docker.io/miki3421/ops-advanced-zookeeper:3.9.7-20261107-r2@sha256:8a6aba58c5455cdf8673f12de4818fec0fd2811ce388e06bcf9dbb6ac3e20a8c
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - set -eu; if test -e /data/myid; then test "$(cat /data/myid)" = 1; else
+          printf "1\n" > /data/myid; fi; exec zkServer.sh start-foreground
         ports:
         - name: zookeeper
           containerPort: 2181
@@ -63,7 +68,6 @@ spec:
           containerPort: 2888
         - name: leader-election
           containerPort: 3888
-
         livenessProbe:
           tcpSocket:
             port: 2181
@@ -75,15 +79,43 @@ spec:
             command:
             - /bin/bash
             - -c
-            - "echo ruok | nc -w 1 localhost 2181 | grep imok"
+            - exec 3<>/dev/tcp/127.0.0.1/2181; printf ruok >&3; read -r -t 2 -N 4
+              reply <&3; test "$reply" = imok
           initialDelaySeconds: 5
           periodSeconds: 10
-          timeoutSeconds: 1
+          timeoutSeconds: 3
         volumeMounts:
         - mountPath: /conf
-          name: zk-config         
+          name: zk-config
         - mountPath: /data
-          name: "zookeeper-pvc-data"
+          name: zookeeper-pvc-data
         - mountPath: /datalog
-          name: "zookeeper-pvc-datalog"
----
+          name: zookeeper-pvc-datalog
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: '1'
+            memory: 768Mi
+        startupProbe:
+          tcpSocket:
+            port: 2181
+          periodSeconds: 2
+          failureThreshold: 60
+          timeoutSeconds: 2
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
