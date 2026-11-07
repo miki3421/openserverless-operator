@@ -60,6 +60,18 @@
     {
       "image": "docker.io/miki3421/ops-advanced-volume-exporter:20261105-r2",
       "digest": "sha256:093ff7128164d3d4740528cdd4bd65b821e589f175a26630212acf25a087bdee"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-etcd:3.7.2-20261016",
+      "digest": "sha256:02969ce1a6172cfd0d4363224e6fc8e9de3051bc43dd384ae82af5ffbca5e3ea"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-milvus:3.0.2-zero-grace-20261016",
+      "digest": "sha256:40e575fa5d4f7fc717ecf9fc0a4d980848a41d47804788eb92e9a383f5f4f3f2"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-pg-dumper:18.6-pgvector0.8.6-dev",
+      "digest": "sha256:b2bb10e4caf3d8eed37006bd12a352058ef4285a477539e3dc0b73435475837d"
     }
   ]
 }
