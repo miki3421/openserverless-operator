@@ -55,7 +55,7 @@ spec:
         - --storage.tsdb.path=/data
         - --web.enable-lifecycle
         - --web.listen-address=:9999
-        image: localhost/ops-advanced-prometheus:3.16.0-20261106-r1@sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b
+        image: docker.io/miki3421/ops-advanced-prometheus:3.16.0-20261106-r1@sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b
         imagePullPolicy: IfNotPresent
         ports:
         - name: web

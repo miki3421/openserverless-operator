@@ -58,7 +58,7 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
-        image: localhost/ops-advanced-alertmanager:0.34.2-20261106-r1@sha256:899999e4ef1aced4e2fcd287065b8ae6bcf7488ed9d715f6c8b6845743ca3058
+        image: docker.io/miki3421/ops-advanced-alertmanager:0.34.2-20261106-r1@sha256:899999e4ef1aced4e2fcd287065b8ae6bcf7488ed9d715f6c8b6845743ca3058
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3

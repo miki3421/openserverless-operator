@@ -1,0 +1,11 @@
+{
+  "parentManifest": "sha256:86ecae31b1dd76fa7a06c4f1e3f62ca7bd74c84c61a96f80fff517e3d5d0243c",
+  "memberCount": 148,
+  "members": {
+    "alert-manager/alertmanager-03-dep.yaml": "4e38601e92c1e73fba72b662baa48da2535128d635f076d826aa122636ef556f",
+    "monitoring/prometheus-03-dep.yaml": "d2c190426ae9505e7820812d7968cc94b98d8d6a113081a17762225e1364a77d",
+    "monitoring/kubestate-03-dep.yaml": "bca5d28cda05edca0476934dfa9503674ae3c8d025a545ec88898a3d08f44a26",
+    "registry/02-registry-sts.yaml": "1c27db25a5724929e0dd41448e74b90bcdc011f727ee5229b7ae66c4c2300590",
+    "kafka/kafka-001-sts.yaml": "41f715dd84bdc19cd50f9a915ab3396e0528902e202ba3f47a23af51190afe60"
+  }
+}

@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: registry
-          image: localhost/ops-advanced-registry:3.1.2-20261106-r1
+          image: docker.io/miki3421/ops-advanced-registry:3.1.2-20261106-r1
           ports:
             - containerPort: 5000
           env:

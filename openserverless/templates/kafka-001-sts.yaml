@@ -104,7 +104,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
-        image: "localhost/ops-advanced-volume-exporter:20261105-r2"
+        image: "docker.io/miki3421/ops-advanced-volume-exporter:20261105-r2"
         imagePullPolicy: "IfNotPresent"
         args:
           - --volume-dir=kafka-volume:/kafka
