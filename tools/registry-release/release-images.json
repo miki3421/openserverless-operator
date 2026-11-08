@@ -22,8 +22,8 @@
       "digest": "sha256:f42762c8e0481058ba74a998cf5ed27e8e06be1c0729b2763946ff47db6f0b3e"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-nodejs:22-20261108-native-r1",
-      "digest": "sha256:13695d7f11dc1c66bde74c46c1019e6b6b296b58f2e3fdb439442e071745006d"
+      "image": "docker.io/miki3421/ops-advanced-nodejs:22-20261108-aom-r1",
+      "digest": "sha256:5e39b94fcc21d3b18d43c81da1c006612dbff57dca8021c5d4d69f1995b899d4"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-nodejs:22-trixie-20261107-r1",
