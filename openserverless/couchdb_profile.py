@@ -39,7 +39,10 @@ def validate_existing(existing, pvcs):
         containers = existing.get("spec",{}).get("template",{}).get("spec",{}).get("containers",[])
         couch = next((c for c in containers if c.get("name") == "couchdb"), {})
         mounts = couch.get("volumeMounts",[])
-        if couch.get("image") != PROFILE["image"] or not any(m.get("name")=="couchdb-pvc" and m.get("mountPath")==PROFILE["volume_mount"] for m in mounts):
+        # Only exact, qualified package-refresh predecessors may reuse this data
+        # layout. A version tag or a matching repository alone proves nothing.
+        compatible_images = [PROFILE["image"], *PROFILE.get("compatible_images", [])]
+        if couch.get("image") not in compatible_images or not any(m.get("name")=="couchdb-pvc" and m.get("mountPath")==PROFILE["volume_mount"] for m in mounts):
             raise RuntimeError("OPS Advanced CouchDB 3.5 requires an explicit migration of the existing database; image or volume layout differs. No CouchDB resources were changed.")
     elif any(p["metadata"]["name"].startswith("couchdb-pvc-couchdb-") for p in pvcs.get("items",[])):
         raise RuntimeError("Existing CouchDB PVCs found without their StatefulSet. Migrate or restore them explicitly; automatic volume reuse is refused.")

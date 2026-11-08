@@ -78,12 +78,16 @@
       "digest": "sha256:137adefa2395428d951f0846ec5a442e98e0d574d7d4efe78bd4fcee1bea4718"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-operator:20261107-kafka-kraft-r1",
-      "digest": "sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14"
+      "image": "docker.io/miki3421/ops-advanced-operator:20261108-couchdb-debian-r1",
+      "digest": "sha256:c4cc14aca0caa47373add89a922e9165936e32ebcc713fda4dddfe27e597589d"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4",
       "digest": "sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd"
+    },
+    {
+      "image": "docker.io/miki3421/ops-advanced-couchdb:3.5.2-20261108-r1",
+      "digest": "sha256:4db3bd054c2123bf58b650344b325690fec6228871e97d7bff4ae6f942cce82f"
     }
   ]
 }

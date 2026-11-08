@@ -33,6 +33,25 @@ class CouchDBAdvancedTests(unittest.TestCase):
         validate_existing(None,{"items":[]})
     def test_current_profile_can_repeat(self):
         validate_existing(self.current(),{"items":[]})
+    def test_exact_qualified_package_refresh_predecessor_accepted(self):
+        predecessors = PROFILE["compatible_images"]
+        self.assertTrue(predecessors)
+        for image in predecessors:
+            self.assertRegex(image, r"@sha256:[0-9a-f]{64}$")
+            existing = self.current()
+            existing["spec"]["template"]["spec"]["containers"][0]["image"] = image
+            validate_existing(existing, {"items": []})
+            existing["spec"]["template"]["spec"]["containers"][0]["volumeMounts"][0]["mountPath"] = "/other"
+            with self.assertRaisesRegex(RuntimeError, "explicit migration"):
+                validate_existing(existing, {"items": []})
+    def test_similar_or_unpinned_images_are_not_qualified(self):
+        for image in [PROFILE["image"].split("@")[0], PROFILE["compatible_images"][0].split("@")[0],
+                      PROFILE["image"].split("@")[0] + "@sha256:" + "0" * 64,
+                      "docker.io/apache/couchdb:3.5.3"]:
+            existing = self.current()
+            existing["spec"]["template"]["spec"]["containers"][0]["image"] = image
+            with self.assertRaisesRegex(RuntimeError, "explicit migration"):
+                validate_existing(existing, {"items": []})
     def test_legacy_image_refused(self):
         existing=self.current();existing["spec"]["template"]["spec"]["containers"][0]["image"]="apache/couchdb:2.3"
         with self.assertRaisesRegex(RuntimeError,"explicit migration"):

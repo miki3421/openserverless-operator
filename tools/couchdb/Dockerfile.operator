@@ -1,0 +1,6 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+# The existing full ADV controller/worker and Kafka configuration is retained.
+FROM docker.io/miki3421/ops-advanced-operator:20261107-kafka-kraft-r1@sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14
+ENV OPERATOR_TAG=20261108-couchdb-debian-r1
+COPY --chown=1001:1001 openserverless/couchdb_profile.py /home/openserverless/openserverless/couchdb_profile.py
+COPY --chown=1001:1001 openserverless/files/couchdb-profile.json /home/openserverless/openserverless/files/couchdb-profile.json
