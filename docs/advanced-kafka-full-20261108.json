@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-08",
+  "platform": "linux/amd64",
+  "scope": "new single-node ADV HTTP laboratory; full Controller/Invoker, Kafka KRaft and five tenant backends",
+  "kubernetes": "v1.36.4+k3s1",
+  "kafkaVersion": "4.4.0",
+  "brokerImage": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4@sha256:4cca13390dc2e488b2e44e2f56da9fa32e01a37430cb15eea734f5db3e34d5dd",
+  "operatorImage": "docker.io/miki3421/ops-advanced-operator:20261107-kafka-kraft-r1@sha256:eabe50cd9e00b8dd58eaed26e0ea8da3727f327063f39d09f35f36bc07645c14",
+  "controllerImageId": "sha256:e926b6578abdf8ff0c3be1a1477e89ae098d4c3a84764d034562783476d90c57",
+  "invokerImageId": "sha256:0190540ea64c7187870e6298148061c245a486ea6bd64d10e81fd2311d1577d4",
+  "sourceOperatorImplementation": "d06befb387dc8e854979093ef80980f58c7e0646",
+  "sourceTaskBase": "25e92c93b22f5c12ac0525ff3e61035e7e324cd7",
+  "streamerTaskSha256": "b9c12b6c25dc2e5349456a15add2dda44aba228a62742dd19878e1b2a96db917",
+  "applicationSourceArchiveSha256": "ccd415e84596678eb57e43d5b48cd7bb4f0d5acf05cc05609e672f9130a187ae",
+  "freshSource": {
+    "namespaceInitiallyAbsent": true,
+    "pvcInitiallyAbsent": true,
+    "k3sReinitialized": true,
+    "priorApplicationDataRestored": false,
+    "fullInvokerProfile": true,
+    "etcdReplicas": 1,
+    "postgresReplicas": 1,
+    "monitoringEnabled": true,
+    "finalTaskCleanInstallRepeatedAfterFix": false,
+    "streamerCanonicalTaskRerenderedAfterFix": true
+  },
+  "steadyStateBeforeBrokerRestart": {
+    "apps.json": 12,
+    "backend-isolation-before-restart.json": 10,
+    "streaming.json": 24,
+    "cron-correlated-before-restart.json": 2
+  },
+  "steadyStateAfterRecovery": {
+    "apps-after-restart.json": 12,
+    "backend-isolation.json": 10,
+    "streaming-after-restart.json": 24,
+    "cron-correlated.json": 2
+  },
+  "steadyStateTotalEachBatch": 48,
+  "extraChecks": {
+    "kafka-app-flow-before.json": 4,
+    "kafka-app-flow-after-recovery.json": 4,
+    "post-restart-data-read.json": 10
+  },
+  "originalDataReusedAfterRestart": true,
+  "newBrokerPodWithSameStatefulSetAndPvc": true,
+  "unchangedKraftClusterDirectoryAndMetadata": true,
+  "correlationMethod": "four successful real Python/Node activations for Alpha/Beta per batch, exact activation IDs found in both invoker0 and completed0 records; explicit partition reads, no diagnostic consumer commits",
+  "restartAvailability": {
+    "uninterrupted": false,
+    "firstPostReadinessRequestHttpStatus": 503,
+    "controllerReportedNoInvokersAvailable": true,
+    "successfulOriginalFixtureReadUpperBoundSecondsAfterBrokerReadiness": 41.209,
+    "recoveryTimingIsAnUpperBoundNotAnSla": true,
+    "failedScheduledJobsDuringInterruption": 1,
+    "failedSyntheticTenantDispatchesInThatJob": 2,
+    "automaticClientRecovery": true,
+    "manualControllerOrInvokerRestart": false,
+    "missedScheduleCatchupQualified": false,
+    "duplicateFreeExecutionQualified": false
+  },
+  "readyPersistentPodsAtFinalSnapshot": 42,
+  "activationHistory": "NOT_AVAILABLE; cron qualified through current CronJob-owned dispatches and Redis heartbeats",
+  "baselineChanged": false,
+  "existingAdvKafkaAndOperatorChanged": false,
+  "existingAdvBrokerVersion": "2.3.1",
+  "retainedFailures": [
+    "preparatory component VM had no ingress CRDs; fresh infrastructure was rebuilt",
+    "canonical uninstall of the incomplete installation raised TypeError and did not finalize",
+    "unfixed full-profile streamer task produced 4 PASS/20 FAIL; corrected canonical task produced 24 PASS",
+    "immediate API 503 and one failed scheduler job during single-broker restart",
+    "optional additional tenant-specific action TCP fixture could not select a unique initialized pod; no new boundary PASS claimed"
+  ],
+  "newTrivyScan": false,
+  "componentQualificationReference": "advanced-kafka-kraft-20261107.json",
+  "arm64Qualified": false,
+  "haQualified": false,
+  "legacyKafkaMigrationQualified": false,
+  "independentReview": "NOT_RUN",
+  "productionQualified": false
+}

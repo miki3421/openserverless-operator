@@ -1,5 +1,9 @@
 # ADV Kafka 4.4.0 fresh-component qualification
 
+Follow-up: the [2026-11-08 full-profile Alpha/Beta rehearsal](advanced-kafka-full-20261108.md)
+records application acceptance, the Streamer task correction and the observed
+single-broker restart interruption. Those results are separate from this batch.
+
 Kafka 4.4.0 / KRaft is the selected **fresh-installation** profile. The existing
 ADV installation still runs its qualified Kafka 2.3.1 / ZooKeeper broker. No
 legacy volume, offsets or application definitions were modified by this batch.
