@@ -24,9 +24,7 @@ import openserverless.operator_util as operator_util
 def create(owner=None):
     logging.info("creating cron")
     
-    img = cfg.get("operator.image","OPERATOR_IMAGE", "ghcr.io/nuvolaris/openwhisk-controller")
-    tag = cfg.get("operator.tag","OPERATOR_TAG", "3.1.0-mastrogpt.2402101445")
-    image = f"{img}:{tag}"
+    image = cfg.operator_image_reference()
     logging.info(f"cron using image {image}")
 
     #default to every minutes if not configured
@@ -96,4 +94,4 @@ def patch(status, action, owner=None):
         logging.info(f"*** hanlded request to {action} cron") 
     except Exception as e:
         logging.error('*** failed to update cron: %s' % e)
-        operator_util.patch_operator_status(status,'cron','error')      
+        operator_util.patch_operator_status(status,'cron','error')

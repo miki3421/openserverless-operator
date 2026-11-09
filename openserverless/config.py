@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-import flatdict, json, os
+import flatdict, json, os, re
 import logging
 
 _config = {}
@@ -56,6 +56,26 @@ def get(key, envvar=None, defval=None):
         return val
     
     return defval
+
+
+def operator_image_reference():
+    """Return a digest-qualified self image, or a legacy image:tag fallback.
+
+    Deployments that set OPERATOR_REFERENCE are required to provide a full
+    immutable sha256 reference.  Older deployments retain the historical
+    image/tag form, but missing sentinel values fail closed.
+    """
+    reference = get("operator.reference", "OPERATOR_REFERENCE")
+    if reference:
+        if not re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", reference):
+            raise ValueError("OPERATOR_REFERENCE must be digest-qualified")
+        return reference
+    image = get("operator.image", "OPERATOR_IMAGE")
+    tag = get("operator.tag", "OPERATOR_TAG")
+    if (not image or not tag or image.startswith("missing-") or
+            tag.startswith("missing-")):
+        raise ValueError("Operator image reference is required")
+    return f"{image}:{tag}"
 
 def put(key, value):
     _config[key] = value

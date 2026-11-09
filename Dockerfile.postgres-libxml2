@@ -1,0 +1,20 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+FROM docker.io/miki3421/ops-advanced-operator:20261109-sqlite-r1@sha256:deb6d770a3e139a58bddf39c71fa1e656a59ecaed272e2ce9c00d156960a8ff6
+
+# Derived jobs must receive the exact deployed image through
+# OPERATOR_REFERENCE.  Never inherit the parent's stale mutable self tag.
+ENV OPERATOR_IMAGE=missing-OPERATOR_IMAGE \
+    OPERATOR_TAG=missing-OPERATOR_TAG
+
+COPY --chown=openserverless:openserverless openserverless/config.py /home/openserverless/openserverless/config.py
+COPY --chown=openserverless:openserverless openserverless/activation_retention.py /home/openserverless/openserverless/activation_retention.py
+COPY --chown=openserverless:openserverless openserverless/cronjob.py /home/openserverless/openserverless/cronjob.py
+COPY --chown=openserverless:openserverless openserverless/quota_checker_job.py /home/openserverless/openserverless/quota_checker_job.py
+COPY --chown=openserverless:openserverless openserverless/couchdb.py /home/openserverless/openserverless/couchdb.py
+COPY --chown=openserverless:openserverless openserverless/postgres_profile.py /home/openserverless/openserverless/postgres_profile.py
+COPY --chown=openserverless:openserverless openserverless/files/postgres-profile.json /home/openserverless/openserverless/files/postgres-profile.json
+COPY --chown=openserverless:openserverless openserverless/templates/postgres.yaml /home/openserverless/openserverless/templates/postgres.yaml
+COPY --chown=openserverless:openserverless deploy/postgres-operator-deploy/postgres.yaml /home/openserverless/deploy/postgres-operator-deploy/postgres.yaml
+
+# The operator seeds its deploy PVC from this archive on a fresh installation.
+RUN cd /home/openserverless/deploy && tar -cf ../deploy.tar *

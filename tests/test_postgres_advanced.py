@@ -35,8 +35,15 @@ class AdvancedPostgresTests(unittest.TestCase):
         validate_existing(None, {"items": []})
 
     def test_rejects_legacy_major(self):
-        with self.assertRaisesRegex(RuntimeError, "explicit migration"):
+        with self.assertRaisesRegex(RuntimeError, "explicitly qualified"):
             validate_existing({"spec": {"image": "pgvector/pgvector:pg16"}}, {"items": []})
+
+    def test_rejects_unqualified_same_major_and_mutable_tag(self):
+        for image in ("pgvector/pgvector:0.8.6-pg18-bookworm",
+                      "example.invalid/postgres:18.6"):
+            with self.subTest(image=image), self.assertRaisesRegex(RuntimeError, "explicitly qualified"):
+                validate_existing({"spec": {"image": image,
+                    "database": {"volumeMount": PROFILE["volume_mount"]}}}, {"items": []})
 
     def test_rejects_old_layout_even_with_new_image(self):
         with self.assertRaisesRegex(RuntimeError, "data layout"):
@@ -44,6 +51,11 @@ class AdvancedPostgresTests(unittest.TestCase):
 
     def test_repeated_install(self):
         validate_existing({"spec": {"image": PROFILE["image"], "database": {"volumeMount": PROFILE["volume_mount"]}}}, {"items": []})
+
+    def test_exact_previous_digest_is_the_only_upgrade_source(self):
+        self.assertEqual(len(PROFILE["upgrade_from_images"]), 1)
+        validate_existing({"spec": {"image": PROFILE["upgrade_from_images"][0],
+            "database": {"volumeMount": PROFILE["volume_mount"]}}}, {"items": []})
 
     def test_orphaned_volumes_are_not_reused(self):
         with self.assertRaisesRegex(RuntimeError, "PVCs"):
@@ -84,7 +96,9 @@ class AdvancedPostgresTests(unittest.TestCase):
             self.assertEqual(list(path.glob("*.gz*")), [])
             fake.write_text("#!/bin/sh\necho complete\n")
             result = subprocess.run(["bash", "-c", config["data"]["backup_database.sh"]], env={**os.environ, "PATH": directory + ":" + os.environ["PATH"], "KUBEGRES_RESOURCE_NAME": "test", "BACKUP_DESTINATION_FOLDER": directory, "BACKUP_SOURCE_DB_HOST_NAME": "unused"}, capture_output=True)
-            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.returncode, 0,
+                             result.stdout.decode(errors="replace")
+                             + result.stderr.decode(errors="replace"))
             archives = list(path.glob("*.gz"))
             self.assertEqual(len(archives), 1)
             self.assertEqual(archives[0].stat().st_mode & 0o777, 0o600)

@@ -23,7 +23,7 @@ OPS Advanced uses PostgreSQL 18.6 and pgvector 0.8.6, pinned by the OCI index di
 
 The database volume mounts at `/var/lib/postgresql`; Kubegres explicitly sets PGDATA to `/var/lib/postgresql/pgdata`. New PostgreSQL 18 clusters enable data checksums. This layout must not be applied to existing PostgreSQL 16 volumes.
 
-`postgres_profile.preflight()` executes before PostgreSQL reconciliation. It refuses differing database images/layouts and orphaned PostgreSQL PVCs. It does not convert data, implement migration, or constitute a rollback system. Read errors fail closed. The guard also intentionally refuses an unreviewed future digest change.
+`postgres_profile.preflight()` executes before PostgreSQL reconciliation. It accepts the exact current image and explicitly listed, qualified patch predecessors when the data layout is unchanged; every other image transition is refused. It also refuses layout changes and orphaned PostgreSQL PVCs. It does not convert data, implement a major-version migration, or constitute a rollback system. Read errors fail closed. Future digest changes require a new explicit qualification.
 
 ## Build for an isolated lab
 
@@ -66,6 +66,10 @@ An isolated Kind v1.33.1 cluster in the retained KVM VM passed:
 - Eight unit tests; read-only rejection of the existing host PostgreSQL 16 deployment.
 
 This is not yet validation of the complete OPS application suite, FerretDB, automated major-version migration, automatic failover under node failure, performance gains, or ARM64 execution. See the root Advanced roadmap for those gates.
+
+## libxml2 security backport qualification (2026-11-09)
+
+The PostgreSQL server image carries a source-built Debian libxml2 backport for CVE-2026-6653. The image profile pins both the qualified replacement and its single accepted predecessor by OCI digest. Qualification covered package and ABI deltas, XML/DTD/XPath/XMLTABLE behavior, pgvector, transactions and rollback, logical dump/restore, restart persistence, and reopening the predecessor's physical data directory. The retained ADV rollout preserved the Kubegres resource and all 16 PVC identities; Alpha/Beta application checks, direct backend isolation and post-rollout SQL health passed. Raw vulnerability-scanner occurrence counts remain the prior snapshot until a separate scan is run.
 
 ## Integrated K3s validation (2026-10-08)
 

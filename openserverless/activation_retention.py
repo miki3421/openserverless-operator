@@ -25,10 +25,7 @@ def resources():
     # New task installations explicitly set 30. An old CR missing this field
     # must not silently acquire a destructive policy on an operator upgrade.
     days = retention_days(cfg.getall().get(FIELD, 0))
-    image = cfg.get("operator.image", "OPERATOR_IMAGE")
-    tag = cfg.get("operator.tag", "OPERATOR_TAG")
-    if not image or not tag:
-        raise ValueError("Operator image and tag are required for activation retention")
+    image = cfg.operator_image_reference()
     credentials = {}
     for field in ("user", "password"):
         value = cfg.get(f"couchdb.controller.{field}", f"COUCHDB_CONTROLLER_{field.upper()}")
@@ -54,7 +51,7 @@ def resources():
                     "securityContext": {"runAsNonRoot": True, "runAsUser": 1001,
                                         "runAsGroup": 1001, "seccompProfile": {"type": "RuntimeDefault"}},
                     "containers": [{
-                        "name": NAME, "image": f"{image}:{tag}", "imagePullPolicy": "IfNotPresent",
+                        "name": NAME, "image": image, "imagePullPolicy": "IfNotPresent",
                         "command": ["/home/openserverless/.venv/bin/python", "-B", "-m",
                                     "openserverless.activation_cleanup", "--days", str(days)],
                         "securityContext": {"allowPrivilegeEscalation": False,

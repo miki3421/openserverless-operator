@@ -26,9 +26,10 @@ def validate_existing(existing, pvcs):
     """Refuse implicit major upgrades and reuse of orphaned database volumes."""
     if existing:
         spec = existing.get("spec", {})
-        if (spec.get("image") != PROFILE["image"] or
+        qualified_images = [PROFILE["image"], *PROFILE.get("upgrade_from_images", [])]
+        if (spec.get("image") not in qualified_images or
                 spec.get("database", {}).get("volumeMount") != PROFILE["volume_mount"]):
-            raise RuntimeError("OPS Advanced PostgreSQL 18 requires an explicit migration of the existing database; image or data layout differs. No PostgreSQL resources were changed.")
+            raise RuntimeError("OPS Advanced PostgreSQL 18 requires an explicitly qualified image transition and unchanged data layout. No PostgreSQL resources were changed.")
     elif any(item["metadata"]["name"].startswith("postgres-db-openserverless-postgres-")
              for item in pvcs.get("items", [])):
         raise RuntimeError("Existing PostgreSQL PVCs found without their Kubegres resource. Restore or migrate them explicitly; automatic volume reuse is refused.")

@@ -66,9 +66,7 @@ def create(owner=None):
     user = f"db_username={u}"
     pasw = f"db_password={p}"
 
-    img = cfg.get('operator.image', 'OPERATOR_IMAGE', "missing-operator-image")
-    tag = cfg.get('operator.tag', 'OPERATOR_TAG', "missing-operator-tag")
-    image = f"{img}:{tag}"
+    image = cfg.operator_image_reference()
     container_image = couchdb_profile.PROFILE["image"]
 
     data = {

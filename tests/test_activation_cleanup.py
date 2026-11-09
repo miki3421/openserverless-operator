@@ -118,8 +118,7 @@ class RetentionResourcesTests(unittest.TestCase):
     def setUp(self):
         cfg.clean()
         cfg.put("components.couchdb", True)
-        cfg.put("operator.image", "example/operator")
-        cfg.put("operator.tag", "test")
+        cfg.put("operator.reference", "example/operator:test@sha256:" + "a" * 64)
         cfg.put("couchdb.controller.user", "controller")
         cfg.put("couchdb.controller.password", "synthetic-secret")
 
@@ -138,6 +137,13 @@ class RetentionResourcesTests(unittest.TestCase):
         self.assertEqual(pod["containers"][0]["command"][-2:], ["--days", "30"])
         self.assertNotIn("synthetic-secret", str(job))
         self.assertEqual(secret["stringData"]["user"], "controller")
+        self.assertEqual(pod["containers"][0]["image"],
+                         "example/operator:test@sha256:" + "a" * 64)
+
+    def test_mutable_operator_reference_is_rejected(self):
+        cfg.put("operator.reference", "example/operator:latest")
+        with self.assertRaisesRegex(ValueError, "digest-qualified"):
+            retention.resources()
 
     def test_old_cr_missing_field_and_explicit_zero_are_suspended(self):
         self.assertTrue(retention.resources()[1]["spec"]["suspend"])

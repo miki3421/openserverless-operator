@@ -24,10 +24,7 @@ import openserverless.operator_util as operator_util
 def create(owner=None):
     logging.info("creating quota cheker scheduled job")
    
-    img = cfg.get('operator.image','OPERATOR_IMAGE') or "missing-operator-image"
-    tag = cfg.get('operator.tag','OPERATOR_TAG') or "missing-operator-tag"
-
-    image = f"{img}:{tag}"
+    image = cfg.operator_image_reference()
     logging.info("quota job using image %s", image)
 
     #default to every minutes if not configured
