@@ -1,0 +1,15 @@
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+ARG SECURITY_PACKAGES_IMAGE=docker.io/miki3421/ops-advanced-bookworm-security:20261109-r1@sha256:65c238b1d8e0463e350c1bb815fcbd830f175f0991247a6b59b9ca226e39c582
+FROM ${SECURITY_PACKAGES_IMAGE} AS bookworm-security
+FROM docker.io/miki3421/ops-advanced-operator:20261108-couchdb-debian-r1@sha256:c4cc14aca0caa47373add89a922e9165936e32ebcc713fda4dddfe27e597589d
+
+USER root
+COPY --from=bookworm-security /out/sqlite/ /tmp/sqlite-security/
+RUN test "$(dpkg-query -W -f='${Version}' libsqlite3-0)" = '3.40.1-2+deb12u2' \
+    && cd /tmp/sqlite-security && sha256sum -c SHA256SUMS \
+    && dpkg -i libsqlite3-0_3.40.1-2+deb12u2+0ops1_amd64.deb \
+    && mkdir -p /usr/share/ops-security/sqlite \
+    && cp SOURCE SHA256SUMS patched-source.sha256 sqlite-distinct-order.patch copyright changelog distinct-test.log ./*.dsc /usr/share/ops-security/sqlite/ \
+    && test "$(dpkg-query -W -f='${Version}' libsqlite3-0)" = '3.40.1-2+deb12u2+0ops1' \
+    && rm -rf /tmp/sqlite-security
+USER openserverless

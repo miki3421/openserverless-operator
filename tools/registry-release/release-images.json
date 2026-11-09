@@ -2,8 +2,8 @@
   "platform": "linux/amd64",
   "images": [
     {
-      "image": "docker.io/miki3421/ops-advanced-admin-api:20261105-r1",
-      "digest": "sha256:000ff4888b8b905ea8e06a6ff3534ed48de7e4c1ce405ce1e30222023dd86a7a"
+      "image": "docker.io/miki3421/ops-advanced-admin-api:20261109-sqlite-r1",
+      "digest": "sha256:b9047fa10047236864c32b4ff3509eb95d3d9b80911f2685aa2e70ec033d2d26"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-alertmanager:0.34.2-20261106-r1",
@@ -22,8 +22,8 @@
       "digest": "sha256:f42762c8e0481058ba74a998cf5ed27e8e06be1c0729b2763946ff47db6f0b3e"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-nodejs:22-20261108-libxml2-r1",
-      "digest": "sha256:53baedd26dfb2b72cda94eb6a9cfeb8228070b001fbea9a58378ead3272f968f"
+      "image": "docker.io/miki3421/ops-advanced-nodejs:22-20261109-no-openssh-r1",
+      "digest": "sha256:6681bdf2d99e482f6a699e657c41936c9f835c9ea29db7ca7eb5ba6e9dc0fb1f"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-nodejs:22-trixie-20261107-r1",
@@ -34,8 +34,8 @@
       "digest": "sha256:14dd90dd67668cd945f0f54fab389c9b817df0332d0927eed23f6f06666f569b"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-python:3.12-20261105-r1",
-      "digest": "sha256:1b935970f83b0cf15c9e0d807f830e653f25c7d87ef26182cc41f9fa3447c011"
+      "image": "docker.io/miki3421/ops-advanced-python:3.12-20261109-native-r1",
+      "digest": "sha256:d808617099c9860b20b0f557db2014aa22a6596db934608032f486d47008ebd6"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-python:3.15-20261105-r1",
@@ -78,8 +78,8 @@
       "digest": "sha256:137adefa2395428d951f0846ec5a442e98e0d574d7d4efe78bd4fcee1bea4718"
     },
     {
-      "image": "docker.io/miki3421/ops-advanced-operator:20261108-couchdb-debian-r1",
-      "digest": "sha256:c4cc14aca0caa47373add89a922e9165936e32ebcc713fda4dddfe27e597589d"
+      "image": "docker.io/miki3421/ops-advanced-operator:20261109-sqlite-r1",
+      "digest": "sha256:deb6d770a3e139a58bddf39c71fa1e656a59ecaed272e2ce9c00d156960a8ff6"
     },
     {
       "image": "docker.io/miki3421/ops-advanced-kafka:4.4.0-20261107-r4",

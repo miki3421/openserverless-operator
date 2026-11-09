@@ -16,6 +16,9 @@
 # under the License.
 #
 # Rebuild the four operator CLIs from pinned source/modules with patched Go.
+ARG SECURITY_PACKAGES_IMAGE=docker.io/miki3421/ops-advanced-bookworm-security:20261109-r1@sha256:65c238b1d8e0463e350c1bb815fcbd830f175f0991247a6b59b9ca226e39c582
+FROM ${SECURITY_PACKAGES_IMAGE} AS bookworm-security
+
 FROM golang:1.27.3-bookworm@sha256:b08bc99468058b6d8a0ada17fa54996b910d5e82a7e95bee0372e3bd98415258 AS operator-tools
 ENV GOTOOLCHAIN=local CGO_ENABLED=0
 COPY tools/go-tools /build/go-tools
@@ -130,6 +133,15 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     apt-get update && apt-get install -y --no-install-recommends \
     curl zip unzip openssl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=bookworm-security /out/sqlite/ /tmp/sqlite-security/
+RUN test "$(dpkg-query -W -f='${Version}' libsqlite3-0)" = '3.40.1-2+deb12u2' \
+    && cd /tmp/sqlite-security && sha256sum -c SHA256SUMS \
+    && dpkg -i libsqlite3-0_3.40.1-2+deb12u2+0ops1_amd64.deb \
+    && mkdir -p /usr/share/ops-security/sqlite \
+    && cp SOURCE SHA256SUMS patched-source.sha256 sqlite-distinct-order.patch copyright changelog distinct-test.log ./*.dsc /usr/share/ops-security/sqlite/ \
+    && test "$(dpkg-query -W -f='${Version}' libsqlite3-0)" = '3.40.1-2+deb12u2+0ops1' \
+    && rm -rf /tmp/sqlite-security
 
 COPY --from=operator-tools /out/ /usr/bin/
 
