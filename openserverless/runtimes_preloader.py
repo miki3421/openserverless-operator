@@ -45,7 +45,14 @@ def create(owner=None):
     return res
 
 def delete_by_owner():
-    spec = kus.build("runtimes")
+    # The rendered kustomization is mutable runtime state and is absent after
+    # an operator image upgrade.  The preloader has a fixed identity, so delete
+    # it by that identity instead of requiring a previous render to exist.
+    spec = {
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {"name": "preload-runtimes", "namespace": "openserverless"},
+    }
     res = kube.delete(spec)
     logging.info(f"delete runtimes preloader: {res}")
     return res

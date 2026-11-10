@@ -44,8 +44,8 @@ def patch_preloader(owner: None):
         preloader.create(owner)
         logging.info("*** handled request to patch openwhisk runtime preloader")
     except Exception as e:
-        logging.error("*** failed to patch openwhisk runtime preloader",e)
-import openserverless.invoker as invoker
+        logging.exception("*** failed to patch openwhisk runtime preloader: %s", e)
+        raise
 
 def redeploy_invoker(owner=None):
     try:

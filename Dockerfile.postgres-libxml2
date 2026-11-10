@@ -8,13 +8,20 @@ ENV OPERATOR_IMAGE=missing-OPERATOR_IMAGE \
 
 COPY --chown=openserverless:openserverless openserverless/config.py /home/openserverless/openserverless/config.py
 COPY --chown=openserverless:openserverless openserverless/activation_retention.py /home/openserverless/openserverless/activation_retention.py
+COPY --chown=openserverless:openserverless openserverless/patcher.py /home/openserverless/openserverless/patcher.py
+COPY --chown=openserverless:openserverless openserverless/runtimes_preloader.py /home/openserverless/openserverless/runtimes_preloader.py
 COPY --chown=openserverless:openserverless openserverless/cronjob.py /home/openserverless/openserverless/cronjob.py
 COPY --chown=openserverless:openserverless openserverless/quota_checker_job.py /home/openserverless/openserverless/quota_checker_job.py
 COPY --chown=openserverless:openserverless openserverless/couchdb.py /home/openserverless/openserverless/couchdb.py
 COPY --chown=openserverless:openserverless openserverless/postgres_profile.py /home/openserverless/openserverless/postgres_profile.py
 COPY --chown=openserverless:openserverless openserverless/files/postgres-profile.json /home/openserverless/openserverless/files/postgres-profile.json
 COPY --chown=openserverless:openserverless openserverless/templates/postgres.yaml /home/openserverless/openserverless/templates/postgres.yaml
+COPY --chown=openserverless:openserverless openserverless/templates/runtimes-job-container-attach.yaml /home/openserverless/openserverless/templates/runtimes-job-container-attach.yaml
 COPY --chown=openserverless:openserverless deploy/postgres-operator-deploy/postgres.yaml /home/openserverless/deploy/postgres-operator-deploy/postgres.yaml
+COPY --chown=openserverless:openserverless deploy/runtimes /home/openserverless/deploy/runtimes
 
 # The operator seeds its deploy PVC from this archive on a fresh installation.
-RUN cd /home/openserverless/deploy && tar -cf ../deploy.tar *
+RUN test -f /home/openserverless/deploy/runtimes/runtimes-preload.yaml \
+    && test -f /home/openserverless/openserverless/templates/runtimes-job-container-attach.yaml \
+    && cd /home/openserverless/deploy && tar -cf ../deploy.tar * \
+    && tar -tf ../deploy.tar | grep -qx 'runtimes/runtimes-preload.yaml'
