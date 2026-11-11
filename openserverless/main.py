@@ -25,7 +25,7 @@ import openserverless.couchdb as couchdb
 import openserverless.activation_retention as activation_retention
 import openserverless.openwhisk as openwhisk
 import openserverless.cronjob as cron
-import openserverless.mongodb_native as ferretdb
+import openserverless.ferretdb as ferretdb
 import openserverless.issuer as issuer
 import openserverless.endpoint as endpoint
 import openserverless.zookeeper as zookeeper
