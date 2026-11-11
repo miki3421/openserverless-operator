@@ -36,18 +36,6 @@ spec:
               value: "{{redis_enabled}}"
             - name: MONGODB_ENABLED
               value: "{{mongodb_enabled}}"
-            - name: MONGODB_ADMIN_USER
-              valueFrom:
-                secretKeyRef:
-                  name: openserverless-mongodb-auth
-                  key: username
-                  optional: true
-            - name: MONGODB_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: openserverless-mongodb-auth
-                  key: password
-                  optional: true
             - name: PG_PASSWORD
               valueFrom:
                 secretKeyRef:

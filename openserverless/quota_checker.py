@@ -219,18 +219,23 @@ def start():
 
     pg_wsku = get_wsk_users("{.items[?(@.spec.postgres.quota)]}")
     pg_wsku=[u for u in pg_wsku if u["spec"].get("postgres",{}).get("enabled") and u["spec"]["postgres"].get("quota") is not None]
-    if pg_wsku and os.environ.get("POSTGRES_ENABLED","true")!="false":
-        pg_client=PostgresClient(os.environ.get("DATABASE_DB_HOST_NAME"),5432,os.environ.get("PG_USER"),os.environ.get("PG_PASSWORD"))
-        check_pg_quota(pg_client,pg_client.query_all_pg_database_size(),pg_wsku)
-    if os.environ.get("MONGODB_ENABLED")=="true":
-        from openserverless.mongodb_native import admin_client
-        mongo_wsku=get_wsk_users("{.items[?(@.spec.mongodb.enabled == true)]}")
-        if any(u["spec"].get("mongodb",{}).get("enabled") and u["spec"]["mongodb"].get("quota") is not None for u in mongo_wsku):
-            client=admin_client()
-            try:
-                check_mongo_quota(client,mongo_wsku)
-            finally:
-                client.close()
+    ferretdb_wsku = get_wsk_users("{.items[?(@.spec.mongodb.quota)]}")
+    ferretdb_wsku=[u for u in ferretdb_wsku if u["spec"].get("mongodb",{}).get("enabled") and u["spec"]["mongodb"].get("quota") is not None]
+
+    check_postgres = bool(pg_wsku) and os.environ.get("POSTGRES_ENABLED", "true") != "false"
+    check_ferretdb = bool(ferretdb_wsku) and os.environ.get("MONGODB_ENABLED") == "true"
+    if check_postgres or check_ferretdb:
+        pg_client = PostgresClient(
+            os.environ.get("DATABASE_DB_HOST_NAME"),
+            5432,
+            os.environ.get("PG_USER"),
+            os.environ.get("PG_PASSWORD"),
+        )
+        pg_dbsize_list = pg_client.query_all_pg_database_size()
+        if check_postgres:
+            check_pg_quota(pg_client, pg_dbsize_list, pg_wsku)
+        if check_ferretdb:
+            check_pg_quota(pg_client, pg_dbsize_list, ferretdb_wsku, True)
     redis_wsku = get_wsk_users("{.items[?(@.spec.redis.quota != 'auto')]}")
     redis_wsku=[u for u in redis_wsku if u["spec"].get("redis",{}).get("enabled") and u["spec"]["redis"].get("quota") not in (None,"auto")]
     if redis_wsku and os.environ.get("REDIS_ENABLED","true")!="false":

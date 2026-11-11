@@ -21,6 +21,10 @@
 FROM docker.io/miki3421/ops-advanced-operator@sha256:50563fce3d60a5ed338d0db99de7042cc893380840b685493c749486ec30ec93
 
 COPY --chown=1001:1001 openserverless/main.py /home/openserverless/openserverless/main.py
+COPY --chown=1001:1001 openserverless/patcher.py /home/openserverless/openserverless/patcher.py
+COPY --chown=1001:1001 openserverless/user_handlers.py /home/openserverless/openserverless/user_handlers.py
+COPY --chown=1001:1001 openserverless/quota_checker.py /home/openserverless/openserverless/quota_checker.py
+COPY --chown=1001:1001 openserverless/templates/quota-cronjob-attach.yaml /home/openserverless/openserverless/templates/quota-cronjob-attach.yaml
 COPY --chown=1001:1001 openserverless/templates/ferretdb-sts.yaml /home/openserverless/openserverless/templates/ferretdb-sts.yaml
 COPY --chown=1001:1001 deploy/ferretdb/ferretdb-sts.yaml /home/openserverless/deploy/ferretdb/ferretdb-sts.yaml
 

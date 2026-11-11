@@ -186,7 +186,9 @@ def whisk_create(spec, name, **kwargs):
     else:
         state['static'] = "off"
 
-    if cfg.get('components.postgres'):
+    # FerretDB stores its data in PostgreSQL, so PostgreSQL is also required
+    # when the Mongo-compatible interface is enabled on its own.
+    if cfg.get('components.postgres') or cfg.get('components.mongodb'):
         msg = postgres.create(owner)
         logging.info(msg)
         state['postgres'] = "on"

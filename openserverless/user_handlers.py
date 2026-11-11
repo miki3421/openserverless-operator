@@ -24,7 +24,7 @@ import kopf
 import openserverless.config as cfg
 import openserverless.couchdb as cdb
 import openserverless.endpoint as endpoint
-import openserverless.mongodb_native as mdb
+import openserverless.ferretdb as mdb
 import openserverless.kube as kube
 import openserverless.milvus_standalone as milvus
 import openserverless.postgres_operator as postgres
@@ -187,4 +187,4 @@ def whisk_user_resume(spec, name, namespace,annotations, **kwargs):
         state['milvus']= True 
 
     if(cfg.get('components.postgres') and ucfg.get('postgres.enabled')):
-        state['postgres']= True                          
+        state['postgres']= True
