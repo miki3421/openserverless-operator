@@ -15,18 +15,24 @@ public class AtlasSmoke { public static JsonObject main(JsonObject input) {
 '''
 GO_CGO='''package main
 /*
-#cgo LDFLAGS: -l:libsqlite3.so.0
+#cgo LDFLAGS: -ldl
 // Exercise the shipped shared-library ABI without adding development headers
 // that were never part of the original runtime contract.
 typedef struct sqlite3 sqlite3;
 typedef struct sqlite3_stmt sqlite3_stmt;
-int sqlite3_open(const char*, sqlite3**);
-int sqlite3_close(sqlite3*);
-int sqlite3_prepare_v2(sqlite3*, const char*, int, sqlite3_stmt**, const char**);
-int sqlite3_step(sqlite3_stmt*);
-int sqlite3_column_int(sqlite3_stmt*, int);
-int sqlite3_finalize(sqlite3_stmt*);
-const char* sqlite3_libversion(void);
+#include <dlfcn.h>
+static void* sqlite_library;
+static int sqlite3_open(const char* n, sqlite3** d) {
+ sqlite_library=dlopen("libsqlite3.so.0", RTLD_NOW);
+ if (!sqlite_library) return -1;
+ return ((int(*)(const char*,sqlite3**))dlsym(sqlite_library,"sqlite3_open"))(n,d);
+}
+static int sqlite3_close(sqlite3* d) {return ((int(*)(sqlite3*))dlsym(sqlite_library,"sqlite3_close"))(d);}
+static int sqlite3_prepare_v2(sqlite3* d,const char* q,int n,sqlite3_stmt** s,const char** t) {return ((int(*)(sqlite3*,const char*,int,sqlite3_stmt**,const char**))dlsym(sqlite_library,"sqlite3_prepare_v2"))(d,q,n,s,t);}
+static int sqlite3_step(sqlite3_stmt* s) {return ((int(*)(sqlite3_stmt*))dlsym(sqlite_library,"sqlite3_step"))(s);}
+static int sqlite3_column_int(sqlite3_stmt* s,int c) {return ((int(*)(sqlite3_stmt*,int))dlsym(sqlite_library,"sqlite3_column_int"))(s,c);}
+static int sqlite3_finalize(sqlite3_stmt* s) {return ((int(*)(sqlite3_stmt*))dlsym(sqlite_library,"sqlite3_finalize"))(s);}
+static const char* sqlite3_libversion(void) {return ((const char*(*)(void))dlsym(sqlite_library,"sqlite3_libversion"))();}
 #define SQLITE_ROW 100
 #include <stdlib.h>
 */
