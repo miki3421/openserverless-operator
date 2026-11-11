@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: registry
-          image: docker.io/miki3421/ops-advanced-registry:3.1.2-20261106-r1
+          image: docker.io/miki3421/ops-advanced-registry:3.1.2-20261106-r1@sha256:75a843bf4b74c23c6776dbabbbd674b1ba5bc4ff1a1b7af3bce5d31a2b866351
           ports:
             - containerPort: 5000
           env:

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Freeze deployment-only references on the qualified FerretDB operator.
+# No package or Python dependency is changed by this layer.
+FROM docker.io/miki3421/ops-advanced-operator@sha256:6543afa0d5a72799d81e755d8884d29f1467dbb2f1552457c3aa7ce93b93625e
+COPY --chown=1001:1001 openserverless/templates/nginx-static-sts.yaml /home/openserverless/openserverless/templates/nginx-static-sts.yaml
+COPY --chown=1001:1001 openserverless/templates/invoker-sts.yaml /home/openserverless/openserverless/templates/invoker-sts.yaml
+COPY --chown=1001:1001 openserverless/templates/couchdb-init.yaml /home/openserverless/openserverless/templates/couchdb-init.yaml
+COPY --chown=1001:1001 openserverless/templates/enterprise-sts.yaml /home/openserverless/openserverless/templates/enterprise-sts.yaml
+COPY --chown=1001:1001 deploy/openwhisk-enterprise/enterprise-sts.yaml /home/openserverless/deploy/openwhisk-enterprise/enterprise-sts.yaml
+COPY --chown=1001:1001 deploy/openwhisk-invoker/invoker-sts.yaml /home/openserverless/deploy/openwhisk-invoker/invoker-sts.yaml
+COPY --chown=1001:1001 deploy/nginx-static/nginx-static-sts.yaml /home/openserverless/deploy/nginx-static/nginx-static-sts.yaml
+COPY --chown=1001:1001 openserverless/templates/kafka-001-sts.yaml /home/openserverless/openserverless/templates/kafka-001-sts.yaml
+COPY --chown=1001:1001 deploy/kafka/kafka-001-sts.yaml /home/openserverless/deploy/kafka/kafka-001-sts.yaml
+COPY --chown=1001:1001 deploy/registry/02-registry-sts.yaml /home/openserverless/deploy/registry/02-registry-sts.yaml
+COPY --chown=1001:1001 deploy/postgres-operator/kubegres-operator.yaml /home/openserverless/deploy/postgres-operator/kubegres-operator.yaml
+RUN cd /home/openserverless/deploy && tar cf ../deploy.tar *

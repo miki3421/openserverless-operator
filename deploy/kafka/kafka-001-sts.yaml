@@ -117,7 +117,7 @@ spec:
           capabilities:
             drop:
             - ALL
-        image: docker.io/miki3421/ops-advanced-volume-exporter:20261105-r2
+        image: docker.io/miki3421/ops-advanced-volume-exporter:20261105-r2@sha256:093ff7128164d3d4740528cdd4bd65b821e589f175a26630212acf25a087bdee
         imagePullPolicy: IfNotPresent
         args:
         - --volume-dir=kafka-volume:/kafka
