@@ -10,7 +10,8 @@ and the SQLite security carrier are immutable references. APT package versions
 are recorded by the resulting image SBOM; repository updates can change a
 later rebuild, which must receive a new identity and qualification.
 
-Go preserves the original compiler and warms its standard-library cache under
+Go preserves the compiler contract within the same minor release, updated to
+the verified Go 1.26.11 toolchain. It warms the standard-library cache under
 the same `GOCACHE=/tmp` setting used by action compilation. The SQLite carrier
 retains the qualified source backport and license evidence.
 

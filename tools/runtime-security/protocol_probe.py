@@ -107,7 +107,7 @@ def main():
                 elif name=='go-legacy-binary':assert reply['version']=='go1.26.8' and reply['language']=='go'
                 else:
                     assert reply['marker']==marker
-                    assert reply['version']==('go1.26.8' if name.startswith('go') else '1.8.0_512')
+                    assert reply['version']==('go1.26.11' if name.startswith('go') else '1.8.0_512')
                     if name.startswith('go'):assert reply['uid']==65534
                 rows.append({'case':name,'check':'run-'+str(count+1),'status':'PASS'})
         except Exception:
