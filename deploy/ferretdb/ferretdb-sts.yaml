@@ -40,7 +40,7 @@ spec:
         fsGroup: 1001
         fsGroupChangePolicy: Always
       containers:
-      - image: ghcr.io/nuvolaris/ferretdb:1.6.0
+      - image: ghcr.io/nuvolaris/ferretdb:1.6.0@sha256:f26cdb07433c057d428e5605136248b08587d7188adafcecd2c8b075e63d6863
         name: ferretdb
         env:
         - name: FERRETDB_POSTGRESQL_URL
