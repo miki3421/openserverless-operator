@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+FROM docker.io/apache/openserverless-runtime-go@sha256:94eb04a290cbba70ed51a051ece44e0a6771b017ef230310e431b92879fffcfc AS build
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends bc file \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+ADD --checksum=sha256:e92309f38449665d8a49e22b9017ed6ec031619e170a545b7e8ee4feee7183a3 https://codeload.github.com/apache/openserverless-runtimes/tar.gz/2450c08dda7a997e9e8423419781bca1106df814 /tmp/source.tar.gz
+WORKDIR /src
+RUN tar xf /tmp/source.tar.gz --strip-components=1 -C /src && mkdir /out \
+    && ln -s /usr/bin/python3 /usr/local/bin/python \
+    && env -u OW_EXECUTION_ENV -u OW_COMPILER -u OW_WAIT_FOR_ACK -u OW_LOG_INIT_ERROR CGO_ENABLED=0 go test -timeout=4m -json ./openwhisk > /out/proxy-tests.json \
+    && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w' -o /out/proxy \
+    && go version -m /out/proxy > /out/proxy-build.txt \
+    && printf '%s\n' 'https://github.com/apache/openserverless-runtimes' '2450c08dda7a997e9e8423419781bca1106df814' > /out/SOURCE
+FROM scratch
+COPY --from=build /out/ /out/
+COPY --from=build /src/LICENSE /src/NOTICE /src/DISCLAIMER /out/

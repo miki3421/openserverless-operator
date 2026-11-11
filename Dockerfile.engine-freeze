@@ -3,6 +3,11 @@
 # No package or Python dependency is changed by this layer.
 FROM docker.io/miki3421/ops-advanced-operator@sha256:6543afa0d5a72799d81e755d8884d29f1467dbb2f1552457c3aa7ce93b93625e
 COPY --chown=1001:1001 openserverless/util.py /home/openserverless/openserverless/util.py
+COPY --chown=1001:1001 openserverless/issuer.py /home/openserverless/openserverless/issuer.py
+COPY --chown=1001:1001 openserverless/ingress_data.py /home/openserverless/openserverless/ingress_data.py
+COPY --chown=1001:1001 openserverless/templates/cluster-issuer.yaml /home/openserverless/openserverless/templates/cluster-issuer.yaml
+COPY --chown=1001:1001 openserverless/templates/generic-ingress-tpl.yaml /home/openserverless/openserverless/templates/generic-ingress-tpl.yaml
+COPY --chown=1001:1001 deploy/openserverless-permissions/whisk-crd.yaml /home/openserverless/deploy/openserverless-permissions/whisk-crd.yaml
 COPY --chown=1001:1001 openserverless/templates/nginx-static-sts.yaml /home/openserverless/openserverless/templates/nginx-static-sts.yaml
 COPY --chown=1001:1001 openserverless/templates/invoker-sts.yaml /home/openserverless/openserverless/templates/invoker-sts.yaml
 COPY --chown=1001:1001 openserverless/templates/couchdb-init.yaml /home/openserverless/openserverless/templates/couchdb-init.yaml

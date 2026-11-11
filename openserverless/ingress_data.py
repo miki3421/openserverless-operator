@@ -40,6 +40,7 @@ class IngressData:
         self._data = {
             "hostname":hostname,
             "tls":tls,
+            "issuer_name":util.tls_issuer_name(),
             "ingress_class":ingress_class,            
             "traefik_middleware_api_version": util.get_traefik_middleware_api_version(),
             "path_type":path_type,

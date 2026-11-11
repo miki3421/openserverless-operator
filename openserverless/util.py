@@ -305,6 +305,14 @@ def wait_for_http(url: str, timeout: int = 60, up_statuses: List[Union[int, str]
 
     raise TimeoutError("Service did not become ready before timeout")
 
+def tls_issuer_name():
+    """One validated ClusterIssuer name for API and tenant ingress rendering."""
+    import re
+    name = cfg.get('tls.issuer-name') or 'letsencrypt-issuer'
+    if not isinstance(name, str) or len(name) > 63 or not re.fullmatch(r'[a-z0-9](?:[-a-z0-9]*[a-z0-9])?', name):
+        raise ValueError('Invalid TLS ClusterIssuer name')
+    return name
+
 def parse_image(img):
     """
     Parse a string representing a pod image in the form <image>:<tag> and return

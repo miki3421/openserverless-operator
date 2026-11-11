@@ -24,7 +24,7 @@ metadata:
   annotations:
       nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
       {% if tls %}
-      cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+      cert-manager.io/cluster-issuer: "{{issuer_name}}"
       {% endif %}
       {% if ingress_class == 'traefik' %}
       traefik.ingress.kubernetes.io/transport.respondingTimeouts.readTimeout: "{{route_timeout_seconds}}"

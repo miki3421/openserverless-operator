@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+# Licensed under the Apache License, Version 2.0. See LICENSE and NOTICE.
+ARG PROXY_IMAGE=missing:missing
+FROM ${PROXY_IMAGE} AS proxy
+FROM docker.io/miki3421/ops-advanced-bookworm-security@sha256:65c238b1d8e0463e350c1bb815fcbd830f175f0991247a6b59b9ca226e39c582 AS security
+FROM docker.io/apache/openserverless-runtime-go@sha256:94eb04a290cbba70ed51a051ece44e0a6771b017ef230310e431b92879fffcfc
+USER root
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get purge -y openssh-client \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY --from=security /out/sqlite/ /tmp/sqlite-security/
+RUN test "$(dpkg-query -W -f='${Version}' libsqlite3-0)" = '3.40.1-2+deb12u2' \
+    && cd /tmp/sqlite-security && sha256sum -c SHA256SUMS \
+    && dpkg -i libsqlite3-0_3.40.1-2+deb12u2+0ops1_amd64.deb \
+    && mkdir -p /usr/share/ops-security/sqlite \
+    && cp SOURCE SHA256SUMS patched-source.sha256 sqlite-distinct-order.patch copyright changelog distinct-test.log ./*.dsc /usr/share/ops-security/sqlite/ \
+    && rm -rf /tmp/sqlite-security
+COPY --from=proxy /out/proxy /bin/proxy
+COPY --from=proxy /out/proxy-build.txt /out/proxy-tests.json /out/SOURCE /usr/share/ops-security/proxy/
+# The shipped compiler uses GOCACHE=/tmp. Precompile its real launcher under
+# exactly that setting, so the first 256 MiB action need not build the stdlib.
+RUN mkdir -p /tmp/ops-cache-warmup && cp /lib/launcher.go /tmp/ops-cache-warmup/main.go \
+    && printf '%s\n' 'package main' 'func Main(args map[string]interface{}) map[string]interface{} { return args }' > /tmp/ops-cache-warmup/action.go \
+    && cd /tmp/ops-cache-warmup && go mod init exec \
+    && GOROOT=/usr/local/go GOPATH=/home/go GOCACHE=/tmp GO111MODULE=on go build -ldflags='-s -w' -o /tmp/ops-cache-warmup/exec \
+    && rm -rf /tmp/ops-cache-warmup && chown -R nobody:root /tmp
+USER nobody

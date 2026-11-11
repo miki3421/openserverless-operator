@@ -20,9 +20,19 @@ import openserverless.kube as kube
 import openserverless.kustomize as kus
 import openserverless.config as cfg
 import openserverless.operator_util as operator_util
+import openserverless.util as util
 
 def create(owner=None):
     logging.info(f"*** Configuring cluster issuer")
+    issuer_name = util.tls_issuer_name()
+    if cfg.get('tls.external-issuer'):
+        # External PKI is provisioned independently. Never replace its spec,
+        # create a fallback ACME issuer, read its key or adopt its ownership.
+        resource = json.loads(kube.kubectl('get', 'clusterissuer', issuer_name, '-o', 'json', namespace=None, debugresult=False))
+        if not any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in resource.get('status', {}).get('conditions', [])):
+            raise ValueError(f'External ClusterIssuer {issuer_name} is not Ready')
+        cfg.put('state.issuer.spec', None)
+        return f'Using external ClusterIssuer {issuer_name}'
     # We deploy a cluster-issuer
     runtime = cfg.get('openserverless.kube')
     acme_registered_email = cfg.get('tls.acme-registered-email') or "nuvolaris@nuvolaris.io"
@@ -46,6 +56,7 @@ def create(owner=None):
         "acme_server_url": acme_server_url,
         "issuer_class":issuer_class,
         "name": "tls",
+        "issuer_name": issuer_name,
         "runtime": runtime
     }
     
@@ -70,6 +81,9 @@ def delete_by_spec():
         return res
 
 def delete(owner=None):
+    if cfg.get('tls.external-issuer'):
+        logging.info('Preserving the externally managed ClusterIssuer')
+        return False
     if owner:        
         return delete_by_owner()
     else:
