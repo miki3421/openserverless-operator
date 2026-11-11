@@ -315,17 +315,20 @@ def parse_image(img):
     >>> "0.3.0-morpheus.22122609" == img_data["tag"]
     True
     """
-    tmp_img_items = img.split(":")
-
-    if len(tmp_img_items) != 2:
-        raise Exception(f"wrong image name format {img}. Image and tag must be separated by a :")
-
-    data = {
-        "image": tmp_img_items[0],
-        "tag": tmp_img_items[1],
-    }
-
-    return data
+    # Legacy templates concatenate image + ':' + tag. Split on the final
+    # colon so registry ports and tag@sha256 references survive unchanged.
+    if not isinstance(img, str) or not img or any(c.isspace() for c in img):
+        raise ValueError("Invalid image reference")
+    if any(c in img for c in "\"'`$\\"):
+        raise ValueError("Invalid image reference")
+    split = img.rfind(":")
+    if split <= img.rfind("/") or split == len(img) - 1:
+        raise ValueError("Image requires an explicit tag or digest")
+    if "@" in img:
+        import re
+        if not re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", img):
+            raise ValueError("Invalid image digest")
+    return {"image": img[:split], "tag": img[split + 1:]}
 
 def get_controller_image_data(data):
     controller_image = cfg.get("controller.image")
