@@ -299,14 +299,14 @@ def _add_milvus_user_metadata(ucfg: UserConfig, user_metadata: UserMetadata):
         return None
 
 
-def create_ow_milvus(ucfg: UserConfig, user_metadata: UserMetadata, owner=None):
+def create_ow_milvus(ucfg: UserConfig, user_metadata: UserMetadata, owner=None, *, resume=False):
     logging.info(f"*** configuring MILVUS database for {ucfg.get('namespace')}")
 
     adminClient = MilvusAdminClient()
     username = ucfg.get("namespace")
     password = ucfg.get("milvus.password")
     database = ucfg.get("milvus.database")
-    res = adminClient.setup_user(username, password, database)
+    res = adminClient.setup_user(username, password, database, resume=resume)
 
     if (res):
         _add_milvus_user_metadata(ucfg, user_metadata)

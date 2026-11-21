@@ -129,15 +129,16 @@ class CouchDB:
       return json.loads(r.text)
     return None
 
-  def update_doc(self, database, doc):
+  def update_doc(self, database, doc, *, refresh_revision=True):
     if '_id' in doc:
       url = f"{self.db_base}{database}/{doc['_id']}"
-      cur = self.get_doc(database, doc['_id'])
-      if cur and '_rev' in cur:
-        doc['_rev'] = cur['_rev']
-        r = self.db_session.put(url, json=doc)
-      else:
-        r = self.db_session.put(url,  json=doc)
+      if refresh_revision:
+        cur = self.get_doc(database, doc['_id'])
+        if cur and '_rev' in cur:
+          doc['_rev'] = cur['_rev']
+      elif not doc.get('_rev'):
+        return False
+      r = self.db_session.put(url, json=doc)
       return r.status_code in [200,201]
     return False
 

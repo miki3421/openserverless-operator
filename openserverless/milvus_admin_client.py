@@ -42,7 +42,7 @@ class MilvusAdminClient:
         # https://milvus.io/docs/grant_privileges.md#Grant-a-privilege-or-a-privilege-group-to-a-role
         self.global_privileges_v2 = ['CollectionAdmin','DatabaseAdmin']
 
-    def setup_user(self, username, password,database):
+    def setup_user(self, username, password, database, *, resume=False):
         """
         Creates a user into MILVUS, creates a corresponding database
         param: username
@@ -51,17 +51,21 @@ class MilvusAdminClient:
         return: True if role has been successfully created
         """
         role = f"{username}_role"
+        timeout = {"timeout": 10} if resume else {}
 
         try:
             # create the user and the database
-            client = MilvusClient(uri=self.milvus_url,token=self.milvus_admin_token)
-            client.create_user(username, password)
-            client.create_database(db_name=database)
+            client = MilvusClient(uri=self.milvus_url,token=self.milvus_admin_token, **timeout)
+            if not resume or username not in client.list_users():
+                client.create_user(username, password)
+            if not resume or database not in client.list_databases():
+                client.create_database(db_name=database)
             client.close()
 
             # rest of action are performed specifying the database
-            client = MilvusClient(uri=self.milvus_url,token=self.milvus_admin_token, db_name=database)
-            client.create_role(role_name=role,db_name=database)
+            client = MilvusClient(uri=self.milvus_url,token=self.milvus_admin_token, db_name=database, **timeout)
+            if not resume or role not in client.list_roles(db_name=database):
+                client.create_role(role_name=role, db_name=database)
             for priv in self.global_privileges_v1:
                 client.grant_privilege(role_name=role, object_type='Global',  object_name='*', privilege=priv, db_name=database)
             for priv in self.global_privileges_v2:
@@ -69,9 +73,15 @@ class MilvusAdminClient:
 
             client.grant_role(user_name=username,role_name=role,db_name=database)
             client.close()
+            if resume:
+                tenant = MilvusClient(uri=self.milvus_url, token=f"{username}:{password}", db_name=database, **timeout)
+                collections = tenant.list_collections()
+                tenant.close()
+                if not isinstance(collections, list):
+                    return False
             return True
         except Exception as ex:
-            logging.error(f"Error adding MILVUS user {username}",ex)
+            logging.error("Could not configure Milvus user %s (%s)", username, type(ex).__name__)
             return False
 
     def remove_user(self, username, database):

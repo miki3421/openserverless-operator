@@ -30,6 +30,7 @@ import openserverless.milvus_standalone as milvus
 import openserverless.postgres_operator as postgres
 import openserverless.redis as redis
 import openserverless.storage_static as static
+import openserverless.tenant_services as tenant_services
 import openserverless.user_patcher as user_patcher
 import openserverless.userdb_util as userdb
 import openserverless.seaweedfs_deploy as seaweedfs
@@ -42,6 +43,18 @@ def get_ucfg(spec):
     ucfg = UserConfig(spec)
     ucfg.dump_config()
     return ucfg
+
+
+@kopf.on.field('openserverless.org', 'v1', 'whisksusers',
+               field=('metadata', 'annotations', tenant_services.REQUEST_ANNOTATION),
+               id='tenant-services-enable', backoff=10)
+@kopf.on.resume('openserverless.org', 'v1', 'whisksusers',
+                id='tenant-services-enable-resume', backoff=10)
+def whisk_user_enable_services(body, patch, **kwargs):
+    try:
+        tenant_services.reconcile(body, patch)
+    except tenant_services.RetryEnablement:
+        raise kopf.TemporaryError('Tenant services are not ready; retrying the original request.', delay=10) from None
 
 @kopf.on.create('openserverless.org', 'v1', 'whisksusers')
 def whisk_user_create(spec, name, patch, **kwargs):

@@ -37,10 +37,11 @@ class MilvusUnauthorizedException(MilvusSimpleException):
 
 class MilvusSimpleClient:
 
-    def __init__(self, uri: str, token: str, db_name: str = None):
+    def __init__(self, uri: str, token: str, db_name: str = None, *, timeout: float | None = None):
         self.milvus_url = uri
         self.token = token
         self.db_name = db_name
+        self.timeout = timeout
 
     def _request(self, endpoint: str, json=None, method: str = "POST", api_level="v2"):
         headers = {
@@ -50,7 +51,7 @@ class MilvusSimpleClient:
         url = f"{self.milvus_url}/{api_level}/vectordb/{endpoint}"
         if json is None:
             json = {}
-        response = requests.request(method, url, headers=headers, json=json)
+        response = requests.request(method, url, headers=headers, json=json, timeout=self.timeout)
         try:
             response.raise_for_status()
             res = response.json()
