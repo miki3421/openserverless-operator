@@ -1,0 +1,4 @@
+3072560a8e4bd70947decc6e4f31cd4712931f639c20812096ae8c77e122ae42  /usr/lib/postgresql/18/bin/postgres
+8da34ed62daeadbe58554870a3a1cc1e922111d0ab8da32846ff23cdf4766eec  /usr/lib/postgresql/18/lib/vector.so
+34bb9f77c4e326b15eb19febca4fdde20fe8a5982629485aa96a8d72e040b57f  /usr/lib/x86_64-linux-gnu/libxml2.so.2.9.14
+9c440299ae04a0a79d55b8bf03307036d890a40979d2fb698073c9050d4b20a5  /usr/local/bin/docker-entrypoint.sh
